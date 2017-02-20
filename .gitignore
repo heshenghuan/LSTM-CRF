@@ -1,0 +1,16 @@
+# python compiled files
+*.pyc
+
+# log files
+*.log
+*log*
+
+# embeddings files, because they are too large
+embeddings/weibo_char_vectors
+embeddings/weibo_charpos_vectors
+
+# dataset files
+data/*
+
+# test file
+*test*
