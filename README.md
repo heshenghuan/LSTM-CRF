@@ -55,7 +55,11 @@ All of those embeddings are trained on a large corpus of Weibo messages.
 
 ## History
 
+- **2017-02-21 ver 0.0.2**
+  - Basical structure of project
+  - Added 3 module file: *features*, *pretreatment* and *constant*
+  - Pretreatment's create dictionary function completed
 - **2017-02-20 ver 0.0.1**
   - Initialization of this project. 
   - README file
-  - Some util function​s and basical structure of project
+  - Some util functions and basical structure of project
