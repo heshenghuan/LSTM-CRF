@@ -7,4 +7,5 @@ Created on 2017-02-20 16:16:36
 http://github.com/heshenghuan
 """
 
-__all__ = ['lstm_ner', 'neural_lib', 'train_util', 'evaluate_util']
+__all__ = ['lstm_ner', 'neural_lib', 'train_util',
+           'evaluate_util', 'pretreatment', 'constant', 'features']
