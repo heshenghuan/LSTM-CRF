@@ -30,3 +30,7 @@ local_templates = (
     (('w',  1), ('w',  2)),
     (('w',  -1), ('w',  1)),
 )
+
+LogP_ZERO = float('-inf')
+LogP_INF = float('inf')
+LogP_ONE = 0.0
