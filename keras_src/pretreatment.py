@@ -161,3 +161,31 @@ def apply_feature_templates(sntc):
         features = feature_extractor(
             readiter(sntc, fields_template.split(' ')))
     return features
+
+
+def generate_prb(train_fn, labels2idx):
+    """
+    Returns initial probability matrix and transition probability matrix.
+    """
+    train = cs.open(train_fn, encoding='utf-8').read().strip().split('\n\n')
+
+    def get_label(stream, pos):
+        return [[e.split()[pos]for e in line.strip().split('\n')]
+                for line in stream]
+
+    size = len(labels2idx)
+    labels = get_label(train, -1)
+    trans = np.zeros((size, size))
+    inits = np.zeros((size))
+    for line in labels:
+        inits[labels2idx[line[0]]] += 1
+        for i in range(1, len(line)):
+            idx1 = labels2idx[line[i-1]]
+            idx2 = labels2idx[line[i]]
+            trans[idx1][idx2] += 1
+    sum_init = sum(inits)
+    inits = np.log(inits/sum_init)
+    for i in range(size):
+        sum_i = sum(trans[i])
+        trans[i] = np.log(trans[i]/sum_i)
+    return inits, trans
