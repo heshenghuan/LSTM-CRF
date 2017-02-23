@@ -16,6 +16,7 @@ POS = 'POS'
 SEG = 'Segmentation'
 PRED_TAG = 'NER'
 task = 'ner'
+MAX_LEN = 140  # Max sequence length, because Weibo's input limitation
 
 # Feature templates
 local_templates = (

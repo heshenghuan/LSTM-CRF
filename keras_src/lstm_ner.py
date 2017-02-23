@@ -16,6 +16,7 @@ import numpy as np
 import codecs as cs
 from train_util import load_params, get_data, conv_data
 from evaluate_util import eval_ner
+from constant import MAX_LEN
 
 
 def convert_id_to_word(corpus, idx2label):
