@@ -17,7 +17,9 @@ import codecs as cs
 import numpy as np
 import cPickle as pickle
 from collections import defaultdict
-from constant import OOV, GOLD_TAG, POS, SEG, PRED_TAG, task, local_templates
+from keras.preprocessing.sequence import pad_sequences
+from keras.utils.np_utils import to_categorical
+from constant import OOV, local_templates, MAX_LEN
 from features import escape, readiter, feature_extractor
 
 random.seed(1337)
@@ -76,8 +78,8 @@ def create_dicts(train_fn, valid_fn, test_fn, threshold, mode, anno=None):
         for ftv in feats:  # ftv一句中某个字的特征集合
             for ft in ftv:  # ft这句话中某个字的按模板生成的某个特征
                 feature_to_freq[ft] += 1
-    features_to_id = {OOV: 0}
-    cur_idx = 1
+    features_to_id = {OOV: 1}
+    cur_idx = 2
     for feats in corpus_feats:
         for ftv in feats:
             for ft in ftv:
@@ -88,7 +90,7 @@ def create_dicts(train_fn, valid_fn, test_fn, threshold, mode, anno=None):
                         cur_idx += 1
 
     word_to_id = {}
-    cur_idx = 0
+    cur_idx = 1
     # print 'construct dict!!'
     for t in corpus_words:
         if t not in word_to_id:
@@ -97,7 +99,7 @@ def create_dicts(train_fn, valid_fn, test_fn, threshold, mode, anno=None):
             cur_idx += 1
 
     label_to_id = {}
-    cur_idx = 0
+    cur_idx = 1
     for ilabels in labels:
         for t in ilabels:
             if t not in label_to_id:
@@ -180,12 +182,33 @@ def generate_prb(train_fn, labels2idx):
     for line in labels:
         inits[labels2idx[line[0]]] += 1
         for i in range(1, len(line)):
-            idx1 = labels2idx[line[i-1]]
+            idx1 = labels2idx[line[i - 1]]
             idx2 = labels2idx[line[i]]
             trans[idx1][idx2] += 1
     sum_init = sum(inits)
-    inits = np.log(inits/sum_init)
+    inits = np.log(inits / sum_init)
     for i in range(size):
         sum_i = sum(trans[i])
-        trans[i] = np.log(trans[i]/sum_i)
+        trans[i] = np.log(trans[i] / sum_i)
     return inits, trans
+
+
+def conv_sntc(X, Y, word2idx, label2idx):
+    sntc = [word2idx.get(w) for w in X]
+    label = [label2idx.get(l) for l in Y]
+    return sntc, label
+
+
+def conv_corpus(sntcs, labels, word2idx, label2idx):
+    assert len(sntcs) == len(
+        labels), "The length of input sentences and labels not equal."
+    new_sntcs = []
+    new_labels = []
+    for sntc, label in zip(sntcs, labels):
+        sntc, label = conv_sntc(sntc, label, word2idx, label2idx)
+        new_sntcs.append(sntc)
+        new_labels.append(label)
+    new_sntcs = pad_sequences(new_sntcs, maxlen=MAX_LEN, padding='post')
+    new_labels = to_categorical(np.asarray(new_labels))
+    # new_labels = pad_sequences(new_labels, maxlen=MAX_LEN, padding='post')
+    return new_sntcs, new_labels
