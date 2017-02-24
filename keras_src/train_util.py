@@ -42,7 +42,7 @@ def read_matrix_from_file(fn, dic, ecd='utf-8'):
         # print row, column
         idx_map = dict()
         line_count = 0
-        M = ArrayInit(ArrayInit.normal).initialize(len(dic), dim)
+        M = ArrayInit(ArrayInit.normal).initialize(len(dic) + 1, dim)
         for line in inf:
             elems = line.rstrip().split(' ')
             if elems[0] in dic:
