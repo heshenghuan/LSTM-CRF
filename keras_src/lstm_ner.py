@@ -42,3 +42,14 @@ class lstm_ner():
             self.model.summary()
         else:
             print "You must call the initialization function before summay."
+
+    def predict(self, samps):
+        assert isinstance(samps, np.array)
+        assert samps.shape[0] > None and samps.shape[1] == MAX_LEN
+        return self.model.predict(samps)
+
+    def viterbi(self, lb_probs):
+        pass
+
+    def sequence_labeling(self, sntc):
+        pass
