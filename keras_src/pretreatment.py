@@ -193,22 +193,76 @@ def generate_prb(train_fn, labels2idx):
     return inits, trans
 
 
-def conv_sntc(X, Y, word2idx, label2idx):
+def conv_sentc(X, Y, word2idx, label2idx):
     sntc = [word2idx.get(w) for w in X]
     label = [label2idx.get(l) for l in Y]
     return sntc, label
 
 
-def conv_corpus(sntcs, labels, word2idx, label2idx):
-    assert len(sntcs) == len(
+def conv_corpus(sentcs, labels, word2idx, label2idx):
+    """
+    Converts the list of sentences and labelSeq. After conversion, it will
+    returns a 2D tensor which contains word's numeric id sequences, and a 3D
+    tensor which contains the one-hot label vectors. All of these tensors have
+    been padded(post 0) by given MAX_LEN.
+
+    The shape of returned 2D tensor is (len(sentcs), MAX_LEN), while the 3D
+    tensor's is (len(sentcs), MAX_LEN, len(label2idx) + 1).
+
+    # Parameters
+        sentcs: the list of corpus' sentences
+        labels: the list of sentcs's label sequences
+        word2idx: the vocabulary of words, a map.
+        word2idx: the vocabulary of labels, a map.
+
+    # Returns
+        new_sentcs: 2D tensor of input corpus
+        new_labels: 3D tensor of input corpus's label sequences
+    """
+    assert len(sentcs) == len(
         labels), "The length of input sentences and labels not equal."
-    new_sntcs = []
+    new_sentcs = []
     new_labels = []
-    for sntc, label in zip(sntcs, labels):
-        sntc, label = conv_sntc(sntc, label, word2idx, label2idx)
-        new_sntcs.append(sntc)
+    for sentc, label in zip(sentcs, labels):
+        sentc, label = conv_sentc(sentc, label, word2idx, label2idx)
+        new_sentcs.append(sentc)
         new_labels.append(label)
-    new_sntcs = pad_sequences(new_sntcs, maxlen=MAX_LEN, padding='post')
-    new_labels = to_categorical(np.asarray(new_labels))
+    new_sentcs = pad_sequences(new_sentcs, maxlen=MAX_LEN, padding='post')
+    new_labels = pad_sequences(new_labels, maxlen=MAX_LEN, padding='post')
+    (row, col) = new_sentcs.shape
+    label_size = len(label2idx) + 1
+    new_labels = to_categorical(np.asarray(
+        new_labels), nb_classes=label_size).reshape((row, col, label_size))
     # new_labels = pad_sequences(new_labels, maxlen=MAX_LEN, padding='post')
-    return new_sntcs, new_labels
+    return new_sentcs, new_labels
+
+
+def read_corpus(fn, mode, anno=None):
+    """
+    Reads corpus file, then returns the list of sentences and labelSeq.
+
+    # Parameters
+        mode: char/charpos
+        anno: has to be None
+
+    # Returns
+        corpus: the list of corpus' sentences
+        labels: the list of sentcs's label sequences
+    """
+    with cs.open(fn, encoding='utf-8') as src:
+        stream = src.read().strip().split('\n\n')
+        corpus = []
+        labels = []
+        for line in stream:
+            line = line.strip().split('\n')
+            sentc = []
+            label = []
+            for e in line:
+                sentc.append(e.split()[0])
+                label.append(e.split()[1])
+            # corpus.append(sntc)
+            # labels.append(label)
+            X = convdata_helper(sentc, label, mode, anno)
+            corpus.append([item[1] for item in X])
+            labels.append([item[2] for item in X])
+        return corpus, labels
