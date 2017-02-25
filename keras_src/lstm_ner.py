@@ -47,9 +47,3 @@ class lstm_ner():
         assert isinstance(samps, np.array)
         assert samps.shape[0] > None and samps.shape[1] == MAX_LEN
         return self.model.predict(samps)
-
-    def viterbi(self, lb_probs):
-        pass
-
-    def sequence_labeling(self, sntc):
-        pass
