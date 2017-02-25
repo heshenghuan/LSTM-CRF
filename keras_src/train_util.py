@@ -113,3 +113,65 @@ def _conv_y(y):
     for i, label in enumerate(y):
         labels[i] = label
     return labels
+
+
+def viterbi_decode(lb_probs, trans_matrix, init_matrix):
+    """
+    Viterbi algorithm to decode a best label sequence by given probability
+    sequence.
+
+    # Parameters
+        lb_probs: a sequence of label probability of words
+        trans_matrix: transition probability matrix
+        init_matrix: initial probability matrix
+
+    # Returns
+        Returns the best label sequence.
+    """
+    # Note that 0 is a reserved state
+    state_size = trans_matrix.shape[0]
+    N = len(lb_probs)
+    prb = 0.
+    prb_max = 0.
+    toward = np.zeros((N, state_size)) - np.inf
+    backward = np.zeros((N, state_size), dtype='int32')
+
+    # run viterbi
+    for i in range(state_size):
+        toward[0][i] = init_matrix[i] + lb_probs[0][i]
+        backward[0][i] = -1
+
+    # toward algorithm
+    for t in range(1, N):
+        for s in range(1, state_size):
+            prb = -np.inf
+            prb_max = -np.inf
+            state_max = 1  # the index of 'O'
+            for i in range(1, state_size):
+                prb = toward[t - 1][i] + trans_matrix[i][s] + lb_probs[t][s]
+                if prb > prb_max:
+                    prb_max = prb
+                    state_max = i
+            toward[t][s] = prb_max
+            backward[t][s] = state_max
+    # backward algorithm
+    index = N - 1
+    taglist = []
+    prb_max = -np.inf
+    state_max = 0
+    for s in range(1, state_size):
+        prb = toward[N - 1][s]
+        if prb > prb_max:
+            prb_max = prb
+            state_max = s
+    taglist.append(state_max)
+    while index >= 1:
+        pre_state = backward[index][taglist[-1]]
+        taglist.append(pre_state)
+        index -= 1
+    taglist.reverse()
+    return taglist
+
+
+def sequence_labeling(sntc):
+    pass
