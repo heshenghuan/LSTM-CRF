@@ -246,13 +246,13 @@ def read_corpus(fn, mode, anno=None):
         anno: has to be None
 
     # Returns
-        corpus: the list of corpus' sentences
-        labels: the list of sentcs's label sequences
+        corpus: the list of corpus' sentences, each sentence is a list of
+                tuple '(char, lexical, label)'
     """
     with cs.open(fn, encoding='utf-8') as src:
         stream = src.read().strip().split('\n\n')
         corpus = []
-        labels = []
+        # labels = []
         for line in stream:
             line = line.strip().split('\n')
             sentc = []
@@ -263,6 +263,27 @@ def read_corpus(fn, mode, anno=None):
             # corpus.append(sntc)
             # labels.append(label)
             X = convdata_helper(sentc, label, mode, anno)
-            corpus.append([item[1] for item in X])
-            labels.append([item[2] for item in X])
-        return corpus, labels
+            # corpus.append([item[1] for item in X])
+            # labels.append([item[2] for item in X])
+            corpus.append(X)
+        # return corpus, labels
+        return corpus
+
+
+def unfold_corpus(corpus):
+    """
+    Unfolds a corpus, converts it's sentences from a list of
+    '(char, lexical, label)' into two independent lists, a lexical words list 
+    and a labels list.
+
+    # Return
+        sentcs: a list of sentences, each sentence is a list of lexcial words
+        labels: a list of labels' sequences
+    """
+    sentcs = []
+    labels = []
+    for sent in corpus:
+        sentcs.append([item[1] for item in sent])
+        labels.append([item[-1] for item in sent])
+
+    return sentcs, labels
