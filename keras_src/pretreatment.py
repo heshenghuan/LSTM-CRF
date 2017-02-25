@@ -175,7 +175,7 @@ def generate_prb(train_fn, labels2idx):
         return [[e.split()[pos]for e in line.strip().split('\n')]
                 for line in stream]
 
-    size = len(labels2idx)
+    size = len(labels2idx) + 1
     labels = get_label(train, -1)
     trans = np.zeros((size, size))
     inits = np.zeros((size))
@@ -187,9 +187,10 @@ def generate_prb(train_fn, labels2idx):
             trans[idx1][idx2] += 1
     sum_init = sum(inits)
     inits = np.log(inits / sum_init)
-    for i in range(size):
+    for i in range(1, size):
         sum_i = sum(trans[i])
         trans[i] = np.log(trans[i] / sum_i)
+    trans[0] = trans[0] - np.inf
     return inits, trans
 
 
