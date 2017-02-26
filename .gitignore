@@ -12,5 +12,8 @@ embeddings/weibo_charpos_vectors
 # dataset files
 data/*
 
-# test file
+# test files
 *test*
+
+# model files
+models/*
