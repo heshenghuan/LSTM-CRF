@@ -16,7 +16,7 @@ POS = 'POS'
 SEG = 'Segmentation'
 PRED_TAG = 'NER'
 task = 'ner'
-MAX_LEN = 140  # Max sequence length, because Weibo's input limitation
+MAX_LEN = 175  # Max sequence length, because Weibo's input limitation
 
 # Feature templates
 local_templates = (
@@ -35,3 +35,8 @@ local_templates = (
 LogP_ZERO = float('-inf')
 LogP_INF = float('inf')
 LogP_ONE = 0.0
+
+BASE_DIR = r'/Users/heshenghuan/Projects/lstm-ner/'
+MODEL_DIR = r'/Users/heshenghuan/Projects/lstm-ner/models/'
+DATA_DIR = r'/Users/heshenghuan/Projects/lstm-ner/data/'
+EMBEDDING_DIR = r'/Users/heshenghuan/Projects/lstm-ner/embeddings/'
