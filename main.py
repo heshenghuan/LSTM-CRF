@@ -16,12 +16,12 @@ import codecs as cs
 from keras_src.lstm_ner import lstm_ner
 from keras_src.constant import MAX_LEN
 from keras_src.pretreatment import read_corpus, conv_corpus, create_dicts
-from __future__ import print_function
 
 
 def add_arg(name, default=None, **kwarg):
-    assert hasattr(
-        add_arg, 'arg_parser'), "You must register an arg_parser with add_arg before calling it"
+    assert hasattr(add_arg, 'arg_parser'), (
+        "You must register an arg_parser with add_arg before calling it"
+    )
     if 'action' in kwarg:
         add_arg.arg_parser.add_argument(name, default=default, **kwarg)
     else:
