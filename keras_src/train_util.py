@@ -173,5 +173,25 @@ def viterbi_decode(lb_probs, trans_matrix, init_matrix):
     return taglist
 
 
-def sequence_labeling(sntc):
-    pass
+def sequence_labeling(sntc, trans_matrix=None, init_matrix=None,
+                      ner_model=None):
+    assert trans_matrix is not None, (
+        "You must pass an instance of numpy.array which is the transition "
+        + "probability matrix to this function's parameter 'trans_matrix'."
+    )
+    assert init_matrix is not None, (
+        "You must pass an instance of numpy.array which is the initial "
+        + "probability matrix to this function's parameter 'init_matrix'."
+    )
+    assert ner_model is not None, (
+        "The NER-Model must be an instance of class which has a classmethod "
+        + "named predict "
+    )
+
+    lb_probs = ner_model.predict(sntc)
+    labels = []
+    for lb_prob in lb_probs:
+        labels.append(viterbi_decode(lb_prob, trans_matrix, init_matrix))
+    return labels
+
+
