@@ -55,6 +55,10 @@ All of those embeddings are trained on a large corpus of Weibo messages.
 
 ## History
 
+- **2017-02-26 ver 0.0.3**
+  - lstm_ner basically completed.
+  - viterbi decoding algorithm and sequence labeling.
+  - Pretreatment completed.
 - **2017-02-21 ver 0.0.2**
   - Basical structure of project
   - Added 3 module file: *features*, *pretreatment* and *constant*
