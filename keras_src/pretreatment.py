@@ -60,8 +60,10 @@ def create_dicts(train_fn, valid_fn, test_fn, threshold, mode, anno=None):
               + ([] if test_fn is None else get_label(test, -1)))
     corpus_feats = []
     corpus_words = []
+    max_len = MAX_LEN
     for lwds, llbs in zip(words, labels):
         X = convdata_helper(lwds, llbs, mode, anno)
+        max_len = max(max_len, len(X))
         features = apply_feature_templates(X)
         feats = []
         for char in X:
@@ -105,7 +107,7 @@ def create_dicts(train_fn, valid_fn, test_fn, threshold, mode, anno=None):
             if t not in label_to_id:
                 label_to_id[t] = cur_idx
                 cur_idx += 1
-    return features_to_id, word_to_id, label_to_id
+    return features_to_id, word_to_id, label_to_id, max_len
 
 
 def convdata_helper(chars, labels, repre, anno):
@@ -200,7 +202,7 @@ def conv_sentc(X, Y, word2idx, label2idx):
     return sntc, label
 
 
-def conv_corpus(sentcs, labels, word2idx, label2idx):
+def conv_corpus(sentcs, labels, word2idx, label2idx, max_len=MAX_LEN):
     """
     Converts the list of sentences and labelSeq. After conversion, it will
     returns a 2D tensor which contains word's numeric id sequences, and a 3D
@@ -211,10 +213,11 @@ def conv_corpus(sentcs, labels, word2idx, label2idx):
     tensor's is (len(sentcs), MAX_LEN, len(label2idx) + 1).
 
     # Parameters
-        sentcs: the list of corpus' sentences
-        labels: the list of sentcs's label sequences
+        sentcs: the list of corpus' sentences.
+        labels: the list of sentcs's label sequences.
         word2idx: the vocabulary of words, a map.
         word2idx: the vocabulary of labels, a map.
+        max_len: the maximum length of input sentence.
 
     # Returns
         new_sentcs: 2D tensor of input corpus
@@ -228,8 +231,8 @@ def conv_corpus(sentcs, labels, word2idx, label2idx):
         sentc, label = conv_sentc(sentc, label, word2idx, label2idx)
         new_sentcs.append(sentc)
         new_labels.append(label)
-    new_sentcs = pad_sequences(new_sentcs, maxlen=MAX_LEN, padding='post')
-    new_labels = pad_sequences(new_labels, maxlen=MAX_LEN, padding='post')
+    new_sentcs = pad_sequences(new_sentcs, maxlen=max_len, padding='post')
+    new_labels = pad_sequences(new_labels, maxlen=max_len, padding='post')
     (row, col) = new_sentcs.shape
     label_size = len(label2idx) + 1
     new_labels = to_categorical(np.asarray(
@@ -249,6 +252,7 @@ def read_corpus(fn, mode, anno=None):
     # Returns
         corpus: the list of corpus' sentences, each sentence is a list of
                 tuple '(char, lexical, label)'
+        length: the length of each sentence in corpus
     """
     with cs.open(fn, encoding='utf-8') as src:
         stream = src.read().strip().split('\n\n')
@@ -268,7 +272,8 @@ def read_corpus(fn, mode, anno=None):
             # labels.append([item[2] for item in X])
             corpus.append(X)
         # return corpus, labels
-        return corpus
+        length = [len(sent) for sent in corpus]
+        return corpus, length
 
 
 def unfold_corpus(corpus):
