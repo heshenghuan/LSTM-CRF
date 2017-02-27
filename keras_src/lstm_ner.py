@@ -13,7 +13,7 @@ import codecs as cs
 import cPickle as pickle
 from keras.models import Sequential, load_model
 from keras.layers import LSTM, Embedding
-from keras.optimizers import RMSprop
+from keras.optimizers import RMSprop, SGD
 from constant import MAX_LEN, MODEL_DIR
 
 
@@ -29,8 +29,7 @@ class lstm_ner():
         self.optimizer = None
 
     def initialization(self, nb_words, emb_dim, emb_matrix, output_dim,
-                       lr=0.01, batch_size=None, time_steps=MAX_LEN,
-                       fine_tuning=False):
+                       batch_size=None, time_steps=MAX_LEN, fine_tuning=False):
         """
         Initialize an instance.
         """
@@ -46,7 +45,6 @@ class lstm_ner():
 
         self.model.add(self.embedding_layer)
         self.model.add(self.lstm_layer)
-        self.optimizer = RMSprop(lr=lr)
 
     def summary(self):
         """Print summary information of this lstm_ner to screen."""
@@ -65,6 +63,12 @@ class lstm_ner():
         self.remove_seq_length()
         return ans
 
+    def set_optimizer(self, optimizer='rmsprop', lr=0.01):
+        if optimizer == 'rmsprop':
+            self.optimizer = RMSprop(lr=lr)
+        else:
+            self.optimizer = SGD(lr=lr)
+
     def set_seq_length(self, seq_len=[]):
         """
         """
@@ -78,7 +82,7 @@ class lstm_ner():
 
     def remove_seq_length(self):
         assert self.model is not None, (
-            "You must call the initialization function before remove_seq_length."
+            "You must call the initialization before remove_seq_length."
         )
         self.lstm_layer.input_length = None
 
@@ -88,6 +92,9 @@ class lstm_ner():
             "You must call the initialization function before compile."
         )
         if optimizer is None:
+            assert self.optimizer is not None, (
+                "Cannot compile a model with NONE optimizer."
+            )
             optimizer = self.optimizer
         self.model.compile(optimizer=optimizer, loss=loss, metrics=metrics,
                            **kwargs)
@@ -103,8 +110,7 @@ class lstm_ner():
         self.set_seq_length(sequences_length)
         self.model.fit(x, y, batch_size, nb_epoch, verbose, callbacks,
                        validation_split, validation_data, shuffle,
-                       class_weight, sample_weight, initial_epoch,
-                       **kwargs)
+                       class_weight, sample_weight, initial_epoch)
         self.remove_seq_length()
         return
 
@@ -114,8 +120,7 @@ class lstm_ner():
         assert self.model is not None, (
             "You must call the initialization function before evaluate."
         )
-        return self.model.evaluate(x, y, batch_size, verbose, sample_weight,
-                                   **kwargs)
+        return self.model.evaluate(x, y, batch_size, verbose, sample_weight)
 
     # def call(self, name):
     #     return getattr(self.model, name)()
