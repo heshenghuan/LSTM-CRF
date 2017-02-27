@@ -15,14 +15,11 @@ import jieba
 import random
 import codecs as cs
 import numpy as np
-import cPickle as pickle
 from collections import defaultdict
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils.np_utils import to_categorical
 from constant import OOV, local_templates, MAX_LEN
 from features import escape, readiter, feature_extractor
-
-random.seed(1337)
 
 
 def create_dicts(train_fn, valid_fn, test_fn, threshold, mode, anno=None):
@@ -237,11 +234,15 @@ def conv_corpus(sentcs, labels, word2idx, label2idx, max_len=MAX_LEN):
     label_size = len(label2idx) + 1
     new_labels = to_categorical(np.asarray(
         new_labels), nb_classes=label_size).reshape((row, col, label_size))
+    # conv_labels = np.zeros((row, col, label_size))
+    # for i in range(row):
+    #     conv_labels[i] = to_categorical(np.asarray(new_labels[i]), nb_classes=label_size)
+    # new_labels = conv_labels
     # new_labels = pad_sequences(new_labels, maxlen=MAX_LEN, padding='post')
     return new_sentcs, new_labels
 
 
-def read_corpus(fn, mode, anno=None):
+def read_corpus(fn, mode, anno=None, has_label=True):
     """
     Reads corpus file, then returns the list of sentences and labelSeq.
 
@@ -263,8 +264,12 @@ def read_corpus(fn, mode, anno=None):
             sentc = []
             label = []
             for e in line:
-                sentc.append(e.split()[0])
-                label.append(e.split()[1])
+                token = e.split()
+                sentc.append(token[0])
+                if has_label:
+                    label.append(token[-1])
+                else:
+                    label.append(None)
             # corpus.append(sntc)
             # labels.append(label)
             X = convdata_helper(sentc, label, mode, anno)
@@ -293,3 +298,26 @@ def unfold_corpus(corpus):
         labels.append([item[-1] for item in sent])
 
     return sentcs, labels
+
+
+def pretreatment(train_fn, valid_fn, test_fn, threshold=0, emb_type='char',
+                 anno=None, test_label=True):
+    """
+    """
+    print "###################################################################"
+    print "# Pretreatment process."
+    print "###################################################################"
+    dict_feat, dict_lex, dict_y, max_len = create_dicts(
+        train_fn, valid_fn, test_fn, threshold, emb_type, anno)
+    # Reads the train, valid and test file
+    train_corpus, train_lens = read_corpus(
+        train_fn, emb_type, anno, test_label)
+    valid_corpus, valid_lens = read_corpus(
+        valid_fn, emb_type, anno, test_label)
+    test_corpus, test_lens = read_corpus(
+        test_fn, emb_type, anno, test_label)
+    dic = {'words2idx': dict_lex, 'label2idx': dict_y, 'feats2idx': dict_feat}
+    train = (train_corpus, train_lens)
+    valid = (valid_corpus, valid_lens)
+    test = (test_corpus, test_lens)
+    return train, valid, test, dic, max_len
