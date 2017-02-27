@@ -9,13 +9,16 @@ http://github.com/heshenghuan
 
 import os
 import sys
+import random
 import argparse
 import functools
 import numpy as np
 import codecs as cs
 from keras_src.lstm_ner import lstm_ner
-from keras_src.constant import MAX_LEN
-from keras_src.pretreatment import read_corpus, conv_corpus, create_dicts
+from keras_src.evaluate_util import eval_ner
+from keras_src.train_util import load_params, save_parameters, read_matrix_from_file, sequence_labeling, dict_from_argparse
+from keras_src.constant import MAX_LEN, BASE_DIR, MODEL_DIR, DATA_DIR, EMBEDDING_DIR
+from keras_src.pretreatment import pretreatment, unfold_corpus, generate_prb, conv_corpus, read_corpus
 
 
 def add_arg(name, default=None, **kwarg):
@@ -37,18 +40,12 @@ def add_arg_to_L(L, name, default=None, **kwarg):
 
 
 def convert_id_to_word(corpus, idx2label):
-    return [[idx2label[word] for word in sentence]
+    return [[idx2label.get(word, 'O') for word in sentence]
             for sentence
             in corpus]
 
 
-def predict(features, words, idx2label, idx2word,
-            _args, f_classify, groundtruth=None):
-    predictions = convert_id_to_word(
-        # _conv_x(sentence, _args.win, _args.vocsize))
-        [f_classify(f, w) for f, w in zip(features, words)],
-        idx2label
-    )
+def evaluate(predictions, groundtruth=None):
     if groundtruth is None:
         return None, predictions
     # conlleval(predictions, groundtruth,
@@ -58,9 +55,8 @@ def predict(features, words, idx2label, idx2word,
     return results, predictions
 
 
-def write_prediction(filename, output_dir, lex_test, pred_test):
-    f_path = os.path.join(os.path.basename(output_dir), filename)
-    with cs.open(f_path, 'w', encoding='utf-8') as outf:
+def write_prediction(filename, lex_test, pred_test):
+    with cs.open(filename, 'w', encoding='utf-8') as outf:
         for sent_w, sent_l in zip(lex_test, pred_test):
             assert len(sent_w) == len(sent_l)
             for w, l in zip(sent_w, sent_l):
@@ -69,145 +65,209 @@ def write_prediction(filename, output_dir, lex_test, pred_test):
 
 
 def main(_args):
-    if _args.only_test:
-        cargs = {}
-        print "loading parameters!"
-        load_params(_args.save_model_param, cargs)
-        test_feat, test_lex_orig, test_y = get_data(
-            _args.test_data, cargs['feature2idx'], cargs['word2idx'],
-            cargs['label2idx'], cargs['emb_type'],
-            anno=None, has_label=_args.eval_test)
-
-        test_feat, test_lex, test_y = conv_data(
-            test_feat, test_lex_orig, test_y, cargs['win'], cargs['vocsize'])
-        idx2label = dict((k, v) for v, k in cargs['label2idx'].iteritems())
-        idx2word = dict((k, v) for v, k in cargs['word2idx'].iteritems())
-        groundtruth_test = None
-        if _args.eval_test:
-            groundtruth_test = convert_id_to_word(test_y, idx2label)
-        original_text = convert_id_to_word(test_lex_orig, idx2word)
-        f_classify = cargs['f_classify']
-        res_test, pred_test = predict(
-            test_feat, test_lex, idx2label, idx2word,
-            _args, f_classify, groundtruth_test)
-        write_prediction(_args.test_data + '.prediction',
-                         _args.output_dir, original_text, pred_test)
-        exit(0)
-
-    print "loading data from:", _args.training_data, _args.valid_data, _args.test_data
-    train_set, valid_set, test_set, dicts = loaddata(
-        _args.training_data, _args.valid_data, _args.test_data, feature_thresh=_args.ner_feature_thresh, mode=_args.emb_type, test_label=_args.eval_test)
-    train_feat, train_lex_orig, train_y = train_set
-    valid_feat, valid_lex_orig, valid_y = valid_set
-    test_feat, test_lex_orig, test_y = test_set
-    feature2idx = dicts['features2idx']
-    word2idx = dicts['words2idx']
-    label2idx = dicts['labels2idx']
-    # idx2feature = dict((k, v) for v, k in feature2idx.iteritems())
-    _args.label2idx = label2idx
-    _args.word2idx = word2idx
-    _args.feature2idx = feature2idx
-    nclasses = len(label2idx)
-    nsentences = len(train_lex_orig)
     np.random.seed(_args.seed)
     random.seed(_args.seed)
-    _args.y_dim = nclasses
-    _args.vocsize = len(feature2idx)  # ufnum #vocsize
-    _args.in_dim = _args.vocsize  # + 2
-    if _args.circuit == 'plainOrderOneCRF':
-        _args.emission_trans_out_dim = nclasses
-    _args.nsentences = nsentences
-    # eval all training and topology related parameters
-    for a in TOPO_PARAM + TRAIN_PARAM:
-        try:
-            _args.__dict__[a] = eval(_args.__dict__[a])
-        except:
-            pass
-    # This way we can inject code from command line.
-    if _args.use_emb == 'true':
-        M_emb, idx_map = read_matrix_from_file(_args.emb_file, word2idx)
-        emb_var = theano.shared(M_emb, name='emb_matrix')
-        _args.emb_matrix = emb_var
-        _args.emb_dim = len(M_emb[0])
-        print 'embeding size:', _args.emb_dim
-        if _args.fine_tuning == 'true':
-            print 'fine tuning!!!!!'
-            _args.emb_matrix.is_regularizable = True
-    train_feat, train_lex, train_y = conv_data(
-        train_feat, train_lex_orig, train_y, _args.win, _args.vocsize)
-    valid_feat, valid_lex, valid_y = conv_data(
-        valid_feat, valid_lex_orig, valid_y, _args.win, _args.vocsize)
-    test_feat, test_lex, test_y = conv_data(
-        test_feat, test_lex_orig, test_y, _args.win, _args.vocsize)
-    best_f1 = -np.inf
-    param = dict(clr=_args.lr, ce=0, be=0)  # Create Circuit
-    (f_cost, f_update, f_classify, f_debug,
-     cargs) = create_circuit(_args, StackConfig)
+    if _args.only_test:
+        cargs = {}
+        print "###################################################################"
+        print "# Loading parameters!"
+        print "###################################################################"
+        # loading model parameters form file.
+        load_params(_args.save_model_param, cargs)
+        # test_feat, test_lex_orig, test_y = get_data(
+        #     _args.test_data, cargs['feature2idx'], cargs['word2idx'],
+        #     cargs['label2idx'], cargs['emb_type'],
+        #     anno=None, has_label=_args.eval_test)
+        # Read raw corpus
+        test_corpus, test_lens = read_corpus(
+            _args.test_data, cargs['emb_type'],
+            anno=None, has_label=_args.eval_test)
+        # Unfold corpus into sentences part and labels part
+        test_sentcs, test_labels = unfold_corpus(test_corpus)
+        # Convert string word and label to corresponding index
+        test_X, test_Y = conv_corpus(test_sentcs, test_labels,
+                                     cargs['words2idx'], cargs['label2idx'],
+                                     max_len=cargs['max_len'])
+        idx2label = dict((k, v) for v, k in cargs['label2idx'].iteritems())
+        idx2word = dict((k, v) for v, k in cargs['words2idx'].iteritems())
+        groundtruth_test = None
+        if _args.eval_test:
+            groundtruth_test = test_labels
+        model = lstm_ner()
+        model.load()
+        print "###################################################################"
+        print "# Model's summary:"
+        print "###################################################################"
+        model.summary()
+        model.set_optimizer(optimizer=cargs['optimizer'], lr=cargs['lr'])
+        model.compile()
+
+        pred_test = sequence_labeling(test_X, test_lens, cargs['trans'],
+                                      cargs['inits'], model)
+        pred_test_label = convert_id_to_word(pred_test, idx2label)
+        res_test, pred_test_label = evaluate(pred_test_label, groundtruth_test)
+        original_text = [[item[1] for item in sent] for sent in test_corpus]
+        write_prediction(_args.output_dir, original_text, pred_test_label)
+        exit(0)
+
+    print "###################################################################"
+    print "# Loading data from:"
+    print "###################################################################"
+    print "Train:", _args.training_data
+    print "Valid:", _args.valid_data
+    print "Test: ", _args.test_data
+    # pretreatment process: read, split and create vocabularies
+    train_set, valid_set, test_set, dicts, max_len = pretreatment(
+        _args.training_data, _args.valid_data, _args.test_data,
+        threshold=_args.ner_feature_thresh, emb_type=_args.emb_type,
+        test_label=_args.eval_test)
+
+    # Reset the maximum sentence's length
+    max_len = max(MAX_LEN, max_len)
+    _args.max_len = MAX_LEN
+
+    # unfold these corpus
+    train_corpus, train_lens = train_set
+    valid_corpus, valid_lens = valid_set
+    test_corpus, test_lens = test_set
+    train_sentcs, train_labels = unfold_corpus(train_corpus)
+    valid_sentcs, valid_labels = unfold_corpus(valid_corpus)
+    test_sentcs, test_labels = unfold_corpus(test_corpus)
+
+    # vocabularies
+    feats2idx = dicts['feats2idx']
+    words2idx = dicts['words2idx']
+    label2idx = dicts['label2idx']
+    _args.label2idx = label2idx
+    _args.words2idx = words2idx
+    _args.feats2idx = feats2idx
+
+    print "Lexical word size:     %d" % len(words2idx)
+    print "Label size:            %d" % len(label2idx)
+    print "-------------------------------------------------------------------"
+    print "Training data size:    %d" % len(train_corpus)
+    print "Validation data size:  %d" % len(valid_corpus)
+    print "Test data size:        %d" % len(test_corpus)
+    print "Maximum sentence len:  %d" % max_len
+
+    # generate the transition and initial probability matrices
+    inits, trans = generate_prb(_args.training_data, label2idx)
+    _args.inits = inits
+    _args.trans = trans
+
+    # neural network's output_dim
+    nb_classes = len(label2idx) + 1
+    _args.nb_classes = nb_classes
+
+    # Embedding layer's input_dim
+    nb_words = len(words2idx)
+    _args.nb_words = nb_words
+    _args.in_dim = _args.nb_words + 1
+
+    # load embeddings from file
+    print "###################################################################"
+    print "# Reading embeddings from file."
+    print "###################################################################"
+    emb_mat, idx_map = read_matrix_from_file(_args.emb_file, words2idx)
+    _args.emb_matrix = emb_mat
+    _args.emb_dim = emb_mat.shape[1]
+    print "embeddings' size:", emb_mat.shape
+    if _args.fine_tuning:
+        print "The embeddings will be fine-tuned!"
+
     idx2label = dict((k, v) for v, k in _args.label2idx.iteritems())
-    idx2word = dict((k, v) for v, k in _args.word2idx.iteritems())
-    groundtruth_valid = convert_id_to_word(valid_y, idx2label)
+    # idx2words = dict((k, v) for v, k in _args.words2idx.iteritems())
+
+    # convert corpus from string to it's own index seq with post padding 0
+    train_X, train_Y = conv_corpus(train_sentcs, train_labels,
+                                   words2idx, label2idx, max_len=max_len)
+    valid_X, valid_Y = conv_corpus(valid_sentcs, valid_labels,
+                                   words2idx, label2idx, max_len=max_len)
+    test_X, test_Y = conv_corpus(test_sentcs, test_labels,
+                                 words2idx, label2idx, max_len=max_len)
+
+    model = lstm_ner()
+    model.initialization(nb_words=nb_words, emb_dim=_args.emb_dim,
+                         emb_matrix=emb_mat, output_dim=nb_classes,
+                         batch_size=_args.batch_size, time_steps=max_len,
+                         fine_tuning=_args.fine_tuning)
+    print "###################################################################"
+    print "# Model's summary:"
+    print "###################################################################"
+    model.summary()
+
+    print "###################################################################"
+    print "# Training process start."
+    print "###################################################################"
+    rd = 0
+    best_f1 = float('-inf')
+    cargs = dict_from_argparse(_args)
+    param = dict(clr=_args.lr, ce=0, be=0)
+    groundtruth_train = train_labels
+    groundtruth_valid = valid_labels
     groundtruth_test = None
     if _args.eval_test:
-        groundtruth_test = convert_id_to_word(test_y, idx2label)
-    epoch_id = -1
-    while epoch_id + 1 < _args.nepochs:
-        epoch_id += 1
-        train(train_feat, train_lex, train_y, _args, f_cost,
-              f_update, f_debug, epoch_id, param['clr'])
-        # Train and Evaluate
-        if epoch_id % _args.neval_epochs == 0:
-            groundtruth_train = convert_id_to_word(train_y, idx2label)
-            # print 'evaluate train!!!'
-            res_train, pred_train = predict(
-                train_feat, train_lex, idx2label, idx2word, _args, f_classify, groundtruth_train)
-            # print 'evaluate valid!!!'
-            res_valid, pred_valid = predict(
-                valid_feat, valid_lex, idx2label, idx2word, _args, f_classify, groundtruth_valid)
-            res_test, pred_test = predict(
-                test_feat, test_lex, idx2label, idx2word, _args, f_classify, groundtruth_test)
-            print('TEST: epoch', epoch_id,
-                  'train F1', res_train['f1'],
-                  'valid F1', res_valid['f1'],
-                  )
+        groundtruth_test = test_labels
+    while rd < _args.round:
+        print "Training round: %d" % (rd + 1)
+        # training process
+        model.set_optimizer(optimizer=_args.optimizer, lr=param['clr'])
+        model.compile()
+        model.fit(train_X, train_Y, batch_size=_args.batch_size,
+                  nb_epoch=_args.nb_epochs, verbose=_args.verbose,
+                  sequences_length=train_lens)
+
+        # evaluate validation data
+        pred_train = sequence_labeling(train_X, train_lens, trans, inits, model)
+        pred_train_label = convert_id_to_word(pred_train, idx2label)
+        res_train, pred_train_label = evaluate(pred_train_label, groundtruth_train)
+
+        pred_valid = sequence_labeling(valid_X, valid_lens, trans, inits, model)
+        pred_valid_label = convert_id_to_word(pred_valid, idx2label)
+        res_valid, pred_valid_label = evaluate(pred_valid_label, groundtruth_valid)
+
+        pred_test = sequence_labeling(test_X, test_lens, trans, inits, model)
+        pred_test_label = convert_id_to_word(pred_test, idx2label)
+        res_test, pred_test_label = evaluate(pred_test_label, groundtruth_test)
+
+        print "Round", (rd + 1), ": train F1: %f, valid F1: %f" % (res_train['f1'], res_valid['f1'])
+        if _args.eval_test:
+            print 'test F1: %f' % res_test['f1']
+        if res_valid['f1'] > best_f1:
+            best_f1 = res_valid['f1']
+            param['be'] = rd
+            param['last_decay'] = rd
+            # res_train['f1'], , res_test['f1']
+            param['vf1'] = (res_valid['f1'])
+            # res_train['p'], , res_test['p']
+            param['vp'] = (res_valid['p'])
+            # res_train['r'], , res_test['r']
+            param['vr'] = (res_valid['r'])
             if _args.eval_test:
-                print 'test F1', res_test['f1']
-            # If this update created a 'new best' model then save it.
-            if res_valid['f1'] > best_f1:
-                best_f1 = res_valid['f1']
-                param['be'] = epoch_id
-                param['last_decay'] = epoch_id
-                # res_train['f1'], , res_test['f1']
-                param['vf1'] = (res_valid['f1'])
-                # res_train['p'], , res_test['p']
-                param['vp'] = (res_valid['p'])
-                # res_train['r'], , res_test['r']
-                param['vr'] = (res_valid['r'])
-                if _args.eval_test:
-                    param['tf1'] = (res_test['f1'])
-                    param['tp'] = (res_test['p'])
-                    param['tr'] = (res_test['r'])
-                print "saving parameters!"
-                cargs['f_classify'] = f_classify
-                save_parameters(_args.save_model_param, cargs)
-            else:
-                pass
-        # decay learning rate if no improvement in 10 epochs
-        # and (epoch_id - param['be']) % _args.decay_epochs == 0:
-        if _args.decay and (epoch_id - param['last_decay']) >= _args.decay_epochs:
-            print 'learning rate decay at epoch', epoch_id
-            param['last_decay'] = epoch_id
+                param['tf1'] = (res_test['f1'])
+                param['tp'] = (res_test['p'])
+                param['tr'] = (res_test['r'])
+            print "saving parameters!"
+            save_parameters(_args.save_model_param, cargs)
+            model.save()
+        else:
+            pass
+        if _args.decay and (rd - param['last_decay']) >= _args.decay_epochs:
+            print 'learning rate decay at round', rd
+            param['last_decay'] = rd
             param['clr'] *= 0.5
         # If learning rate goes down to minimum then break.
         if param['clr'] < _args.minimum_lr:
             print "\nLearning rate became too small, breaking out of training"
             break
-
-    print('BEST RESULT: epoch', param['be'],
-          'valid F1', param['vf1'], param['vp'], param['vr'],
-          # 'best test F1', param['tf1'], param['tp'], param['tr']
-          )
+        rd += 1
+    print "###################################################################"
+    print "# End of training process."
+    print "###################################################################"
+    print 'BEST RESULT rd', param['be'], ': valid F1: %f, P: %f, R: %f' % (param['vf1'], param['vp'], param['vr'])
     if _args.eval_test:
-        print 'best test F1', param['tf1'], param['tp'], param['tr']
+        print 'test F1: %f, P: %f, R: %f' % (param['tf1'], param['tp'], param['tr'])
+
 
 if __name__ == "__main__":
     ##########################################################################
@@ -219,32 +279,35 @@ if __name__ == "__main__":
     TRAIN_PARAM = []
     # File IO
     add_arg('--only_test', False, help='Only do the test')
-    add_arg('--save_model_param', 'best-parameters',
+    add_arg('--save_model_param', MODEL_DIR+r'parameters.pkl',
             help='The best model will be saved there')
-    add_arg('--training_data', r'../data/weiboNER.conll.train',
+    add_arg('--training_data', DATA_DIR+r'weiboNER.conll.train',
             help='training file name')
-    add_arg('--valid_data', r'../data/weiboNER.conll.valid',
+    add_arg('--valid_data', DATA_DIR+r'weiboNER.conll.valid',
             help='validation file name')
-    add_arg('--test_data', r'../data/weiboNER.conll.test',
+    add_arg('--test_data', DATA_DIR+r'weiboNER.conll.test',
             help='test file name')
-    add_arg('--output_dir', '/export/projects/npeng/weiboNER_data/',
+    add_arg('--output_dir', BASE_DIR+r'export/output.utf8',
             help='the output dir that stores the prediction')
-    add_arg('--eval_test', False,
+    add_arg('--eval_test', True,
             help='Whether evaluate the test data: test data may not have annotations.')
+    # make sure the type of embeddings file is exactly what you argument 'emb_type' gives
     add_arg('--emb_type', 'char',
             help='The embedding type, choose from (char, charpos)')
-    add_arg('--emb_file', r'../embeddings/weibo_char_vectors',
+    add_arg('--emb_file', EMBEDDING_DIR+r'weibo_char_vectors',
             help='The initial embedding file name')
     add_arg('--ner_feature_thresh', 0,
             help="The minimum count OOV threshold for NER")
     # Training
     add_arg_to_L(TRAIN_PARAM, '--lr', 0.05)
     # add_arg_to_L(TRAIN_PARAM, '--use_emb', 'true')
-    add_arg_to_L(TRAIN_PARAM, '--fine_tuning', 'true')
-    add_arg_to_L(TRAIN_PARAM, '--nepochs', 200)
+    add_arg_to_L(TRAIN_PARAM, '--fine_tuning', True)
+    add_arg_to_L(TRAIN_PARAM, '--nb_epochs', 200)
+    add_arg_to_L(TRAIN_PARAM, '--round', 10)
+    add_arg_to_L(TRAIN_PARAM, '--batch_size', 100)
     add_arg_to_L(TRAIN_PARAM, '--neval_epochs', 5)
-    add_arg_to_L(TRAIN_PARAM, '--optimizer', 'sgd')
-    # add_arg_to_L(TRAIN_PARAM, '--seed', 1337, help='set random seed')
+    add_arg_to_L(TRAIN_PARAM, '--optimizer', 'rmsprop')
+    add_arg_to_L(TRAIN_PARAM, '--seed', 1337, help='set random seed')
     add_arg_to_L(TRAIN_PARAM, '--decay', True,  action='store_true')
     add_arg_to_L(TRAIN_PARAM, '--decay_epochs', 10)
     add_arg_to_L(TRAIN_PARAM, '--minimum_lr', 1e-5)
@@ -256,8 +319,8 @@ if __name__ == "__main__":
 #     add_arg_to_L(TOPO_PARAM, '--L2Reg_reg_weight',             0.0)
 #     add_arg_to_L(TOPO_PARAM, '--win',                          1)
     # DEBUG
-    add_arg('--verbose', 2)
+    add_arg('--verbose', 1)
     args = _arg_parser.parse_args()
-    lstm_ner.main(args)
+    main(args)
     # from sighan_ner import loaddata, get_data, eval_ner, error_analysis  # , conlleval
     # main(args)
