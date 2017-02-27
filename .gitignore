@@ -17,3 +17,6 @@ data/*
 
 # model files
 models/*
+
+# Output files
+export/*
