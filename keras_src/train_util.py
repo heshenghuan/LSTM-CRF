@@ -63,6 +63,10 @@ def read_matrix_from_file(fn, dic, ecd='utf-8'):
         return M, idx_map
 
 
+def save_parameters(path, params):
+    pickle.dump(params, open(path, 'w'))
+
+
 def load_params(path, params):
     """
     Loads saved params of model, using cPickle to do save and load.
@@ -173,7 +177,7 @@ def viterbi_decode(lb_probs, trans_matrix, init_matrix):
     return taglist
 
 
-def sequence_labeling(sntc, trans_matrix=None, init_matrix=None,
+def sequence_labeling(sntc, sntc_lens, trans_matrix=None, init_matrix=None,
                       ner_model=None):
     assert trans_matrix is not None, (
         "You must pass an instance of numpy.array which is the transition "
@@ -188,10 +192,13 @@ def sequence_labeling(sntc, trans_matrix=None, init_matrix=None,
         + "named predict "
     )
 
-    lb_probs = ner_model.predict(sntc)
+    lb_probs = ner_model.predict(sntc, sntc_lens)
     labels = []
-    for lb_prob in lb_probs:
+    for i in range(len(lb_probs)):
+        lb_prob = lb_probs[i][0:sntc_lens[i]]
         labels.append(viterbi_decode(lb_prob, trans_matrix, init_matrix))
     return labels
 
 
+def dict_from_argparse(apobj):
+    return dict(apobj._get_kwargs())
