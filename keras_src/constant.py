@@ -37,6 +37,7 @@ LogP_INF = float('inf')
 LogP_ONE = 0.0
 
 BASE_DIR = r'/Users/heshenghuan/Projects/lstm-ner/'
-MODEL_DIR = r'/Users/heshenghuan/Projects/lstm-ner/models/'
-DATA_DIR = r'/Users/heshenghuan/Projects/lstm-ner/data/'
-EMBEDDING_DIR = r'/Users/heshenghuan/Projects/lstm-ner/embeddings/'
+MODEL_DIR = BASE_DIR + r'models/'
+DATA_DIR = BASE_DIR + r'data/'
+EMBEDDING_DIR = BASE_DIR + r'embeddings/'
+OUTPUT_DIR = BASE_DIR + r'export/'
