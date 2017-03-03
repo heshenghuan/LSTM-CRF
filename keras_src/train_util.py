@@ -10,9 +10,7 @@ http://github.com/heshenghuan
 import sys
 import numpy as np
 import codecs as cs
-import keras
 import cPickle as pickle
-from keras import backend as K
 from neural_lib import ArrayInit
 
 
@@ -141,7 +139,7 @@ def viterbi_decode(lb_probs, trans_matrix, init_matrix):
     backward = np.zeros((N, state_size), dtype='int32')
 
     # run viterbi
-    for i in range(state_size):
+    for i in range(1, state_size):
         toward[0][i] = init_matrix[i] + lb_probs[0][i]
         backward[0][i] = -1
 
