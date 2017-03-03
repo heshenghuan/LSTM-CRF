@@ -55,38 +55,38 @@ def create_dicts(train_fn, valid_fn, test_fn, threshold, mode, anno=None):
     labels = (get_label(train, -1)
               + ([] if valid_fn is None else get_label(valid, -1))
               + ([] if test_fn is None else get_label(test, -1)))
-    corpus_feats = []
+    # corpus_feats = []
     corpus_words = []
     max_len = MAX_LEN
     for lwds, llbs in zip(words, labels):
         X = convdata_helper(lwds, llbs, mode, anno)
         max_len = max(max_len, len(X))
-        features = apply_feature_templates(X)
-        feats = []
+        # features = apply_feature_templates(X)
+        # feats = []
         for char in X:
             corpus_words.append(char[1])
-        for i, ftv in enumerate(features):
-            # escape函数将ft中的':'替换成'__COLON__'
-            feat = [escape(ft) for ft in ftv['F']]
-            feats.append(feat)
+        # for i, ftv in enumerate(features):
+        #     # escape函数将ft中的':'替换成'__COLON__'
+        #     feat = [escape(ft) for ft in ftv['F']]
+        #     feats.append(feat)
         assert len(lwds) == len(llbs)
-        assert len(lwds) == len(feats)
-        corpus_feats.append(feats)
-    feature_to_freq = defaultdict(int)
-    for feats in corpus_feats:  # feats一句话的特征列表
-        for ftv in feats:  # ftv一句中某个字的特征集合
-            for ft in ftv:  # ft这句话中某个字的按模板生成的某个特征
-                feature_to_freq[ft] += 1
+        # assert len(lwds) == len(feats)
+        # corpus_feats.append(feats)
+    # feature_to_freq = defaultdict(int)
+    # for feats in corpus_feats:  # feats一句话的特征列表
+    #     for ftv in feats:  # ftv一句中某个字的特征集合
+    #         for ft in ftv:  # ft这句话中某个字的按模板生成的某个特征
+    #             feature_to_freq[ft] += 1
     features_to_id = {OOV: 1}
-    cur_idx = 2
-    for feats in corpus_feats:
-        for ftv in feats:
-            for ft in ftv:
-                if (ft not in features_to_id):
-                    if feature_to_freq[ft] > threshold:
-                        # 只保留出现次数大于一定频次的特征
-                        features_to_id[ft] = cur_idx
-                        cur_idx += 1
+    # cur_idx = 2
+    # for feats in corpus_feats:
+    #     for ftv in feats:
+    #         for ft in ftv:
+    #             if (ft not in features_to_id):
+    #                 if feature_to_freq[ft] > threshold:
+    #                     # 只保留出现次数大于一定频次的特征
+    #                     features_to_id[ft] = cur_idx
+    #                     cur_idx += 1
 
     word_to_id = {}
     cur_idx = 1
@@ -230,10 +230,10 @@ def conv_corpus(sentcs, labels, word2idx, label2idx, max_len=MAX_LEN):
         new_labels.append(label)
     new_sentcs = pad_sequences(new_sentcs, maxlen=max_len, padding='post')
     new_labels = pad_sequences(new_labels, maxlen=max_len, padding='post')
-    (row, col) = new_sentcs.shape
-    label_size = len(label2idx) + 1
-    new_labels = to_categorical(np.asarray(
-        new_labels), nb_classes=label_size).reshape((row, col, label_size))
+    # (row, col) = new_sentcs.shape
+    # label_size = len(label2idx) + 1
+    # new_labels = to_categorical(np.asarray(
+    #     new_labels), nb_classes=label_size).reshape((row, col, label_size))
     # conv_labels = np.zeros((row, col, label_size))
     # for i in range(row):
     #     conv_labels[i] = to_categorical(np.asarray(new_labels[i]), nb_classes=label_size)
