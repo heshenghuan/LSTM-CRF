@@ -10,130 +10,102 @@ http://github.com/heshenghuan
 import os
 import numpy as np
 import codecs as cs
-import cPickle as pickle
-from keras.models import Sequential, load_model
-from keras.layers import LSTM, Embedding
-from keras.optimizers import RMSprop, SGD
-from constant import MAX_LEN, MODEL_DIR
+# import cPickle as pickle
+import tensorflow as tf
+# from keras.models import Sequential, load_model
+# from keras.layers import LSTM, Embedding, Dense
+# from keras.optimizers import RMSprop, SGD
+from constant import MAX_LEN
 
 
 class lstm_ner():
 
-    def __init__(self):
+    def __init__(self, nb_words, emb_dim, emb_matrix, hidden_dim, nb_classes,
+                 keep_prob=1.0, batch_size=None, time_steps=MAX_LEN,
+                 l2_reg=0., fine_tuning=False):
         """
-        Returns an instance of lstm_ner, but not initialized.
+        Returns an instance of lstm_ner.
         """
-        self.model = None
-        self.embedding_layer = None
-        self.lstm_layer = None
-        self.optimizer = None
+        def init_variable(shape):
+            initial = tf.random_uniform(shape, -0.01, 0.01)
+            return tf.Variable(initial)
+        # self.model = None
+        # self.embedding_layer = None
+        # self.lstm_layer = None
+        # self.output_layer = None
+        # self.optimizer = None
+        self.nb_words = nb_words
+        self.emb_dim = emb_dim
+        self.nb_classes = nb_classes
+        self.emb_matrix = emb_matrix
+        self.hidden_dim = hidden_dim
+        self.keep_prob = keep_prob
+        self.batch_size = batch_size
+        self.time_steps = time_steps
+        self.l2_reg = l2_reg
+        self.fine_tuning = fine_tuning
+        with tf.name_scope('inputs'):
+            self.X = tf.placeholder(tf.int32,
+                                    shape=[None, self.time_steps],
+                                    name='X_placeholder')
+            # self.seq_len = tf.placeholder(tf.int32,
+            #                               shape=[batch_size, ],
+            #                               name='seq_len_placeholder')
+            # self.Y = tf.placeholder(tf.int32,
+            #                         shape=[batch_size, time_steps, nb_classes],
+            #                         name='Y_placeholder')
+            # self.keep_prob = tf.placeholder(tf.float32, name='output_dropout')
 
-    def initialization(self, nb_words, emb_dim, emb_matrix, output_dim,
-                       batch_size=None, time_steps=MAX_LEN, fine_tuning=False):
-        """
-        Initialize an instance.
-        """
-        self.model = Sequential()
-        self.embedding_layer = Embedding(nb_words + 1,
-                                         emb_dim,
-                                         weights=[emb_matrix],
-                                         input_length=time_steps,
-                                         mask_zero=True, trainable=fine_tuning)
-        self.lstm_layer = LSTM(output_dim=output_dim,
-                               return_sequences=True,
-                               input_shape=(batch_size, time_steps, emb_dim))
-
-        self.model.add(self.embedding_layer)
-        self.model.add(self.lstm_layer)
-
-    def summary(self):
-        """Print summary information of this lstm_ner to screen."""
-        assert self.model is not None, (
-            "You must call the initialization function before summay."
-        )
-        self.model.summary()
-
-    def predict(self, x=None, seq_len=[], verbose=0):
-        assert self.model is not None, (
-            "You must call the initialization function before predict."
-        )
-        assert isinstance(x, np.ndarray)
-        self.set_seq_length(seq_len)
-        ans = self.model.predict(x, verbose=verbose)
-        self.remove_seq_length()
-        return ans
-
-    def set_optimizer(self, optimizer='rmsprop', lr=0.01):
-        if optimizer == 'rmsprop':
-            self.optimizer = RMSprop(lr=lr)
-        else:
-            self.optimizer = SGD(lr=lr)
-
-    def set_seq_length(self, seq_len=[]):
-        """
-        """
-        assert self.model is not None, (
-            "You must call the initialization function before set_seq_length."
-        )
-        assert len(seq_len) != 0, (
-            "You must pass a list that do stored each sequences' length."
-        )
-        self.lstm_layer.input_length = seq_len
-
-    def remove_seq_length(self):
-        assert self.model is not None, (
-            "You must call the initialization before remove_seq_length."
-        )
-        self.lstm_layer.input_length = None
-
-    def compile(self, optimizer=None, loss='categorical_crossentropy',
-                metrics=['accuracy'], **kwargs):
-        assert self.model is not None, (
-            "You must call the initialization function before compile."
-        )
-        if optimizer is None:
-            assert self.optimizer is not None, (
-                "Cannot compile a model with NONE optimizer."
+        with tf.name_scope('weigths'):
+            self.W = tf.get_variable(
+                shape=[hidden_dim, nb_classes],
+                initializer=tf.truncated_normal_initializer(stddev=0.01),
+                name='weights',
+                regularizer=tf.contrib.layers.l2_regularizer(0.001)
             )
-            optimizer = self.optimizer
-        self.model.compile(optimizer=optimizer, loss=loss, metrics=metrics,
-                           **kwargs)
+            self.lstm_layer = tf.nn.rnn_cell.LSTMCell(self.hidden_dim)
 
-    def fit(self, x, y, batch_size=32, nb_epoch=10, verbose=1, callbacks=None,
-            validation_split=0., validation_data=None, shuffle=True,
-            class_weight=None, sample_weight=None, initial_epoch=0,
-            sequences_length=None, **kwargs):
-        """"""
-        assert self.model is not None, (
-            "You must call the initialization function before fit."
-        )
-        self.set_seq_length(sequences_length)
-        self.model.fit(x, y, batch_size, nb_epoch, verbose, callbacks,
-                       validation_split, validation_data, shuffle,
-                       class_weight, sample_weight, initial_epoch)
-        self.remove_seq_length()
+        with tf.name_scope('biases'):
+            self.b = tf.Variable(tf.zeros([nb_classes], name="bias"))
         return
 
-    def evaluate(self, x, y, batch_size=32, verbose=1, sample_weight=None,
-                 **kwargs):
-        """"""
-        assert self.model is not None, (
-            "You must call the initialization function before evaluate."
-        )
-        return self.model.evaluate(x, y, batch_size, verbose, sample_weight)
+    def length(self, data):
+        # 计算data句子中，非零元素的个数，也即计算句子长度
+        used = tf.sign(tf.reduce_max(tf.abs(data), reduction_indices=2))
+        length = tf.reduce_sum(used, reduction_indices=1)
+        length = tf.cast(length, tf.int32)
+        return length
 
-    # def call(self, name):
-    #     return getattr(self.model, name)()
+    def inference(self, X, reuse=None):
+        word_vectors = tf.nn.embedding_lookup(self.emb_matrix, X)
+        length = self.length(word_vectors)
+        # length = np.asarray(lens, dtype='int32')
+        with tf.variable_scope('label_inference', reuse=reuse):
+            outputs, _ = tf.nn.dynamic_rnn(
+                self.lstm_layer,
+                word_vectors,
+                dtype=tf.float32,
+                sequence_length=length
+            )
 
-    def save(self, filepath=MODEL_DIR+'model.h5', overwrite=True):
-        assert self.model is not None, (
-            "You must call the initialization function before save."
-        )
-        return self.model.save(filepath, overwrite)
+        with tf.name_scope('softmax'):
+            outputs = tf.nn.dropout(outputs, keep_prob=self.keep_prob)
+            outputs = tf.reshape(outputs, [-1, self.emb_dim])
+            scores = tf.matmul(outputs, self.W) + self.b
+            scores = tf.nn.softmax(scores)
+            scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
+        return scores, length
 
-    def load(self, filepath=MODEL_DIR+'model.h5', custom_objects=None):
-        """"""
-        self.model = load_model(filepath, custom_objects)
-        self.embedding_layer = self.model.layers[0]
-        self.lstm_layer = self.model.layers[1]
-        self.optimizer = RMSprop()
+    def loss(self, X, Y):
+        pred, lens = self.inference(X)
+        log_likelihood, self.transition = tf.contrib.crf.crf_log_likelihood(
+            pred, Y, lens)
+        loss = tf.reduce_mean(-log_likelihood)
+        reg = tf.nn.l2_loss(self.emb_matrix)
+        reg += tf.nn.l2_loss(self.W) + tf.nn.l2_loss(self.b)
+        loss += reg * self.l2_reg
+        return loss
+
+    def test_unary_score(self):
+        pred, lens = self.inference(self.X, reuse=True)
+        return pred, lens
