@@ -28,7 +28,87 @@ An implementation of LSTM named entity recognition based on Keras. Using two kin
 
 ## Usage
 
-waiting to be written.
+### Some Constants
+
+In **./keras_src/constants.py** file, I defined some constants. 
+
+```python
+# Those are some IO files' dirs
+# you need change the BASE_DIR on your own PC
+BASE_DIR = r'/Users/heshenghuan/Projects/lstm-ner/'
+MODEL_DIR = BASE_DIR + r'models/'
+DATA_DIR = BASE_DIR + r'data/'
+EMBEDDING_DIR = BASE_DIR + r'embeddings/'
+OUTPUT_DIR = BASE_DIR + r'export/'
+```
+
+### Training
+
+Just run the **./main.py** file. Or specify some arguments if you need, like this:
+
+```shell
+python main.py --lr 0.005 --fine_tuning False --l2_reg 0.0002
+```
+
+Then the model will run on lr=0.005, not fine-tuning, l2_reg=0.0002 and all others default. Using `-h` will print all help informations. Some arguments are not useable now, but I will fix it as soon as possible.
+
+```shell
+python main.py -h
+Using TensorFlow backend.
+usage: main.py [-h] [--train_data TRAIN_DATA] [--test_data TEST_DATA]
+               [--valid_data VALID_DATA] [--log_dir LOG_DIR]
+               [--model_dir MODEL_DIR] [--emb_dir EMB_DIR]
+               [--emb_type EMB_TYPE] [--emb_dim EMB_DIM]
+               [--output_dir OUTPUT_DIR]
+               [--ner_feature_thresh NER_FEATURE_THRESH] [--lr LR]
+               [--keep_prob KEEP_PROB] [--fine_tuning [FINE_TUNING]]
+               [--nofine_tuning] [--eval_test [EVAL_TEST]] [--noeval_test]
+               [--max_len MAX_LEN] [--nb_classes NB_CLASSES]
+               [--hidden_dim HIDDEN_DIM] [--batch_size BATCH_SIZE]
+               [--train_steps TRAIN_STEPS] [--l2_reg L2_REG]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --train_data TRAIN_DATA
+                        Training data file
+  --test_data TEST_DATA
+                        Test data file
+  --valid_data VALID_DATA
+                        Validation data file
+  --log_dir LOG_DIR     The log dir
+  --model_dir MODEL_DIR
+                        Models dir
+  --emb_dir EMB_DIR     Embeddings dir
+  --emb_type EMB_TYPE   Embeddings type: char/charpos
+  --emb_dim EMB_DIM     embedding size
+  --output_dir OUTPUT_DIR
+                        Output dir
+  --ner_feature_thresh NER_FEATURE_THRESH
+                        The minimum count OOV threshold for NER
+  --lr LR               learning rate
+  --keep_prob KEEP_PROB
+                        dropout rate of hidden layer
+  --fine_tuning [FINE_TUNING]
+                        Whether fine-tuning the embeddings
+  --nofine_tuning
+  --eval_test [EVAL_TEST]
+                        Whether evaluate the test data.
+  --noeval_test
+  --max_len MAX_LEN     max num of tokens per query
+  --nb_classes NB_CLASSES
+                        BMES
+  --hidden_dim HIDDEN_DIM
+                        hidden unit number
+  --batch_size BATCH_SIZE
+                        num example per mini batch
+  --train_steps TRAIN_STEPS
+                        trainning steps
+  --l2_reg L2_REG       L2 regularization weight
+```
+
+
+
+
 
 ## Dependencies:
 This is a Keras implementation; it requires installation of these python modules:  
@@ -55,6 +135,9 @@ All of those embeddings are trained on a large corpus of Weibo messages.
 
 ## History
 
+- **2017-03-03 ver 0.1.0**
+  - Using tensorflow to implement the LSTM-NER model.
+  - Basical functino finished.
 - **2017-02-26 ver 0.0.3**
   - lstm_ner basically completed.
   - viterbi decoding algorithm and sequence labeling.
