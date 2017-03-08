@@ -200,3 +200,11 @@ def sequence_labeling(sntc, sntc_lens, trans_matrix=None, init_matrix=None,
 
 def dict_from_argparse(apobj):
     return dict(apobj._get_kwargs())
+
+
+def batch_index(length, batch_size, n_iter=100):
+    index = range(length)
+    for j in xrange(n_iter):
+        np.random.shuffle(index)
+        for i in xrange(int(length / batch_size)):
+            yield index[i * batch_size: (i + 1)*batch_size]
