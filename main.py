@@ -266,6 +266,7 @@ def main(_):
                 sess, test_unary_score, test_sequence_length, trans_matrix,
                 model.X, test_X, test_Y
             )
+            pred_test = [pred_test[i][:test_lens[i]] for i in xrange(len(pred_test))]
             pred_test_label = convert_id_to_word(pred_test, idx2label)
             res_test, pred_test_label = evaluate(pred_test_label, test_labels)
             print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
