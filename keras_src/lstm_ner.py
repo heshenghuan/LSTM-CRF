@@ -120,7 +120,7 @@ class Bi_LSTM_NER():
         self.emb_dim = emb_dim
         self.nb_classes = nb_classes
         self.hidden_dim = hidden_dim
-        self._keep_prob = keep_prob
+        self.Keep_Prob = keep_prob
         self.batch_size = batch_size
         self.time_steps = time_steps
         self.l2_reg = l2_reg
@@ -137,7 +137,7 @@ class Bi_LSTM_NER():
             self.X = tf.placeholder(
                 tf.int32, shape=[None, self.time_steps], name='X_placeholder')
             self.Y = tf.placeholder(
-                tf.int32, shape=[None, time_steps, nb_classes],
+                tf.int32, shape=[None, self.time_steps],
                 name='Y_placeholder')
             # self.seq_len = tf.placeholder(
             #     tf.int32, shape=[None, ], name='seq_len_placeholder')
@@ -149,7 +149,7 @@ class Bi_LSTM_NER():
 
         with tf.name_scope('weigths'):
             self.W = tf.get_variable(
-                shape=[hidden_dim, nb_classes],
+                shape=[hidden_dim * 2, nb_classes],
                 initializer=tf.truncated_normal_initializer(stddev=0.01),
                 name='weights',
                 regularizer=tf.contrib.layers.l2_regularizer(0.001)
@@ -180,10 +180,12 @@ class Bi_LSTM_NER():
                 dtype=tf.float32,
                 sequence_length=length
             )
+            outputs = tf.concat(2, [outputs[0], outputs[1]])
+            outputs = tf.reshape(outputs, [-1, self.hidden_dim * 2])
 
         with tf.name_scope('softmax'):
-            outputs = tf.nn.dropout(outputs, keep_prob=self.keep_prob)
-            outputs = tf.reshape(outputs, [-1, self.emb_dim])
+            # outputs = tf.nn.dropout(outputs, keep_prob=self.keep_prob)
+            # outputs = tf.reshape(outputs, [-1, self.emb_dim])
             scores = tf.matmul(outputs, self.W) + self.b
             scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
@@ -211,13 +213,16 @@ class Bi_LSTM_NER():
             }
             yield feed_dict, len(index)
 
-    def run(self, train_x, train_y, test_x, test_y, FLAGS=None):
+    def run(self, train_x, train_y, valid_x, valid_y,
+            test_x, test_y, FLAGS=None):
         if FLAGS is None:
             print "FLAGS ERROR"
             sys.exit(0)
 
         self.learn_rate = FLAGS.lr
+        self.training_iter = FLAGS.train_steps
         self.train_file_path = FLAGS.train_data
+        self.test_file_path = FLAGS.valid_data
         self.display_step = FLAGS.display_step
         pred, lens = self.inference(self.X)
 
@@ -234,10 +239,10 @@ class Bi_LSTM_NER():
             global_step = tf.Variable(
                 0, name="tr_global_step", trainable=False)
             optimizer = tf.train.AdamOptimizer(
-                learning_rate=self.learning_rate).minimize(cost, global_step=global_step)
+                learning_rate=self.learn_rate).minimize(cost, global_step=global_step)
 
         with tf.name_scope('predict'):
-            correct_pred = tf.equal(tf.argmax(pred, 1), tf.argmax(self.Y, 1))
+            correct_pred = tf.equal(tf.argmax(pred, 2), tf.cast(self.Y, tf.int64))
             accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
             correct_num = tf.reduce_sum(tf.cast(correct_pred, tf.int32))
 
@@ -285,12 +290,12 @@ class Bi_LSTM_NER():
 
                 if i % self.display_step == 0:
                     acc, loss, cnt = 0., 0., 0
-                    for test, num in self.get_batch_data(test_x, test_y, len(test_y), keep_prob=1.0):
+                    for valid, num in self.get_batch_data(valid_x, valid_y, len(valid_y), keep_prob=1.0):
                         _loss, _acc = sess.run(
-                            [cost, correct_num], feed_dict=test)
+                            [cost, correct_num], feed_dict=valid)
                         acc += _acc
                         loss += _loss * num
-                        cnt += num
+                        cnt += num * self.time_steps
                     loss = loss / cnt
                     acc = acc / cnt
                     if acc > max_acc:
@@ -304,4 +309,18 @@ class Bi_LSTM_NER():
                     print 'Iter {}: valid loss={:.6f}, valid acc={:.6f}'.format(step, loss, acc)
                     print 'round {}: max_acc={} BestIter={}\n'.format(i, max_acc, bestIter)
             print 'Optimization Finished!'
-            return sess
+            pred_test_y = []
+            acc, loss, cnt = 0., 0., 0
+            for test, num in self.get_batch_data(test_x, test_y, len(test_y), keep_prob=1.0):
+                prediction, lengths, trans_matrix, _loss, _acc = sess.run([pred, lens, self.transition, cost, correct_num], feed_dict=test)
+                acc += _acc
+                loss += _loss * num
+                cnt += num * self.time_steps
+                for seq, seq_len in zip(prediction, lengths):
+                    seq_scores = seq[:seq_len]
+                    viterbi_seq, _ = tf.contrib.crf.viterbi_decode(
+                        seq_scores, trans_matrix)
+                    pred_test_y.append(viterbi_seq)
+            loss = loss / cnt
+            acc = acc / cnt
+            return pred_test_y, loss, acc
