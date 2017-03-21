@@ -134,7 +134,7 @@ def main(_):
 
     # Reset the maximum sentence's length
     max_len = max(MAX_LEN, max_len)
-    FLAGS.max_len = MAX_LEN
+    FLAGS.max_len = max_len
 
     # unfold these corpus
     train_corpus, train_lens = train_set
@@ -158,7 +158,7 @@ def main(_):
     print "Training data size:    %d" % len(train_corpus)
     print "Validation data size:  %d" % len(valid_corpus)
     print "Test data size:        %d" % len(test_corpus)
-    print "Maximum sentence len:  %d" % max_len
+    print "Maximum sentence len:  %d" % FLAGS.max_len
 
     # generate the transition and initial probability matrices
     # inits, trans = generate_prb(FLAGS.train_data, label2idx)
