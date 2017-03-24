@@ -139,8 +139,8 @@ class Bi_LSTM_NER():
             self.Y = tf.placeholder(
                 tf.int32, shape=[None, self.time_steps],
                 name='Y_placeholder')
-            # self.seq_len = tf.placeholder(
-            #     tf.int32, shape=[None, ], name='seq_len_placeholder')
+            self.X_len = tf.placeholder(
+                tf.int32, shape=[None, ], name='X_len_placeholder')
             self.keep_prob = tf.placeholder(tf.float32, name='output_dropout')
 
         # def init_variable(shape):
@@ -161,16 +161,16 @@ class Bi_LSTM_NER():
             self.b = tf.Variable(tf.zeros([nb_classes], name="bias"))
         return
 
-    def length(self, data):
-        # 计算data句子中，非零元素的个数，也即计算句子长度
-        used = tf.sign(tf.reduce_max(tf.abs(data), reduction_indices=2))
-        length = tf.reduce_sum(used, reduction_indices=1)
-        length = tf.cast(length, tf.int32)
-        return length
+    # def length(self, data):
+    #     # 计算data句子中，非零元素的个数，也即计算句子长度
+    #     used = tf.sign(tf.reduce_max(tf.abs(data), reduction_indices=2))
+    #     length = tf.reduce_sum(used, reduction_indices=1)
+    #     length = tf.cast(length, tf.int32)
+    #     return length
 
-    def inference(self, X, reuse=None):
+    def inference(self, X, X_len, reuse=None):
         word_vectors = tf.nn.embedding_lookup(self.emb_matrix, X)
-        length = self.length(word_vectors)
+        # length = self.length(word_vectors)
         # length = np.asarray(lens, dtype='int32')
         with tf.variable_scope('label_inference', reuse=reuse):
             outputs, _ = tf.nn.bidirectional_dynamic_rnn(
@@ -178,7 +178,7 @@ class Bi_LSTM_NER():
                 cell_bw=self.lstm_bw,
                 inputs=word_vectors,
                 dtype=tf.float32,
-                sequence_length=length
+                sequence_length=X_len
             )
             outputs = tf.concat(2, [outputs[0], outputs[1]])
             outputs = tf.reshape(outputs, [-1, self.hidden_dim * 2])
@@ -189,7 +189,7 @@ class Bi_LSTM_NER():
             scores = tf.matmul(outputs, self.W) + self.b
             scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
-        return scores, length
+        return scores
 
     # def loss(self, X, Y):
     #     pred, lens = self.inference(X)
@@ -204,17 +204,23 @@ class Bi_LSTM_NER():
     def test_unary_score(self):
         return self.inference(self.X, reuse=True)
 
-    def get_batch_data(self, x, y, batch_size, keep_prob):
+    def get_batch_data(self, x, y, l, batch_size, keep_prob):
         for index in batch_index(len(y), batch_size, 1):
             feed_dict = {
                 self.X: x[index],
                 self.Y: y[index],
+                self.X_len: l[index],
                 self.keep_prob: keep_prob,
             }
             yield feed_dict, len(index)
 
-    def run(self, train_x, train_y, valid_x, valid_y,
-            test_x, test_y, FLAGS=None):
+    def run(
+        self,
+        train_x, train_y, train_lens,
+        valid_x, valid_y, valid_lens,
+        test_x, test_y, test_lens,
+        FLAGS=None
+    ):
         if FLAGS is None:
             print "FLAGS ERROR"
             sys.exit(0)
@@ -224,11 +230,11 @@ class Bi_LSTM_NER():
         self.train_file_path = FLAGS.train_data
         self.test_file_path = FLAGS.valid_data
         self.display_step = FLAGS.display_step
-        pred, lens = self.inference(self.X)
+        pred = self.inference(self.X, self.X_len)
 
         with tf.name_scope('loss'):
             log_likelihood, self.transition = tf.contrib.crf.crf_log_likelihood(
-                pred, self.Y, lens)
+                pred, self.Y, self.X_len)
             cost = tf.reduce_mean(-log_likelihood)
             reg = tf.nn.l2_loss(self.W) + tf.nn.l2_loss(self.b)
             if self.fine_tuning:
@@ -281,7 +287,7 @@ class Bi_LSTM_NER():
 
             for i in xrange(self.training_iter):
 
-                for train, _ in self.get_batch_data(train_x, train_y, self.batch_size, self.Keep_Prob):
+                for train, _ in self.get_batch_data(train_x, train_y, train_lens, self.batch_size, self.Keep_Prob):
                     _, step, summary, trans_matrix, loss, acc = sess.run(
                         [optimizer, global_step, summary_op, self.transition, cost, accuracy], feed_dict=train)
                     train_summary_writer.add_summary(summary, step)
@@ -290,7 +296,7 @@ class Bi_LSTM_NER():
 
                 if i % self.display_step == 0:
                     acc, loss, cnt = 0., 0., 0
-                    for valid, num in self.get_batch_data(valid_x, valid_y, len(valid_y), keep_prob=1.0):
+                    for valid, num in self.get_batch_data(valid_x, valid_y, valid_lens, len(valid_y), keep_prob=1.0):
                         _loss, _acc = sess.run(
                             [cost, correct_num], feed_dict=valid)
                         acc += _acc
@@ -311,13 +317,13 @@ class Bi_LSTM_NER():
             print 'Optimization Finished!'
             pred_test_y = []
             acc, loss, cnt = 0., 0., 0
-            for test, num in self.get_batch_data(test_x, test_y, len(test_y), keep_prob=1.0):
-                prediction, lengths, trans_matrix, _loss, _acc = sess.run([pred, lens, self.transition, cost, correct_num], feed_dict=test)
+            for test, num in self.get_batch_data(test_x, test_y, test_lens, len(test_y), keep_prob=1.0):
+                prediction, trans_matrix, _loss, _acc = sess.run([pred, self.transition, cost, correct_num], feed_dict=test)
                 acc += _acc
                 loss += _loss * num
                 cnt += num * self.time_steps
-                for seq, seq_len in zip(prediction, lengths):
-                    seq_scores = seq[:seq_len]
+                for i in xrange(len(prediction)):
+                    seq_scores = prediction[i][:test_lens[i]]
                     viterbi_seq, _ = tf.contrib.crf.viterbi_decode(
                         seq_scores, trans_matrix)
                     pred_test_y.append(viterbi_seq)

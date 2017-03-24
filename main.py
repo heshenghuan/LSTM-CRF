@@ -204,7 +204,11 @@ def main(_):
                         FLAGS.nb_classes, FLAGS.keep_prob, FLAGS.batch_size,
                         FLAGS.max_len, FLAGS.l2_reg, FLAGS.fine_tuning)
 
-    pred_test, test_loss, test_acc = model.run(train_X, train_Y, valid_X, valid_Y, test_X, test_Y, FLAGS)
+    pred_test, test_loss, test_acc = model.run(
+        train_X, train_Y, train_lens,
+        valid_X, valid_Y, valid_lens,
+        test_X, test_Y, test_lens,
+        FLAGS)
 
     pred_test = [pred_test[i][:test_lens[i]] for i in xrange(len(pred_test))]
     pred_test_label = convert_id_to_word(pred_test, idx2label)
