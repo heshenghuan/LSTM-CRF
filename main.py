@@ -178,6 +178,7 @@ def main(_):
     print "#" * 67
     print "# Reading embeddings from file."
     print "#" * 67
+    print "Read embedding type: %s" % (FLAGS.emb_type)
     emb_file = EMBEDDING_DIR + 'weibo_%s_vectors' % (FLAGS.emb_type)
     emb_mat, idx_map = read_matrix_from_file(emb_file, words2idx)
     FLAGS.emb_dim = max(emb_mat.shape[1], FLAGS.emb_dim)
@@ -196,10 +197,19 @@ def main(_):
     test_X, test_Y = conv_corpus(test_sentcs, test_labels,
                                  words2idx, label2idx, max_len=max_len)
 
-    print train_X.shape, train_Y.shape
-    print valid_X.shape, valid_Y.shape
-    print test_X.shape, test_Y.shape
+    print "#" * 67
+    print "Training arguments"
+    print "#" * 67
+    print "L2 regular:    %f" % FLAGS.l2_reg
+    print "nb_classes:    %d" % FLAGS.nb_classes
+    print "Batch size:    %d" % FLAGS.batch_size
+    print "Hidden layer:  %d" % FLAGS.hidden_dim
+    print "Train epochs:  %d" % FLAGS.train_steps
+    print "Learning rate: %f" % FLAGS.lr
 
+    print "#" * 67
+    print "Training process start."
+    print "#" * 67
     model = Bi_LSTM_NER(nb_words, FLAGS.emb_dim, emb_mat, FLAGS.hidden_dim,
                         FLAGS.nb_classes, FLAGS.keep_prob, FLAGS.batch_size,
                         FLAGS.max_len, FLAGS.l2_reg, FLAGS.fine_tuning)
