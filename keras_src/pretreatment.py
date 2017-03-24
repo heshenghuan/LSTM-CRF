@@ -278,6 +278,7 @@ def read_corpus(fn, mode, anno=None, has_label=True):
             corpus.append(X)
         # return corpus, labels
         length = [len(sent) for sent in corpus]
+        length = np.asarray(length, dtype=np.int32)
         return corpus, length
 
 
