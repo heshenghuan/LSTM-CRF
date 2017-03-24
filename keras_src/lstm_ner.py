@@ -204,8 +204,8 @@ class Bi_LSTM_NER():
     def test_unary_score(self):
         return self.inference(self.X, reuse=True)
 
-    def get_batch_data(self, x, y, l, batch_size, keep_prob):
-        for index in batch_index(len(y), batch_size, 1):
+    def get_batch_data(self, x, y, l, batch_size, keep_prob, shuffle=True):
+        for index in batch_index(len(y), batch_size, 1, shuffle):
             feed_dict = {
                 self.X: x[index],
                 self.Y: y[index],
@@ -247,10 +247,10 @@ class Bi_LSTM_NER():
             optimizer = tf.train.AdamOptimizer(
                 learning_rate=self.learn_rate).minimize(cost, global_step=global_step)
 
-        with tf.name_scope('predict'):
-            correct_pred = tf.equal(tf.argmax(pred, 2), tf.cast(self.Y, tf.int64))
-            accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-            correct_num = tf.reduce_sum(tf.cast(correct_pred, tf.int32))
+        # with tf.name_scope('predict'):
+        #     correct_pred = tf.equal(tf.argmax(pred, 2), tf.cast(self.Y, tf.int64))
+        #     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+        #     correct_num = tf.reduce_sum(tf.cast(correct_pred, tf.int32))
 
         with tf.name_scope('summary'):
             localtime = time.strftime("%X %Y-%m-%d", time.localtime())
@@ -260,8 +260,10 @@ class Bi_LSTM_NER():
                 self.batch_size, self.learn_rate, self.Keep_Prob, self.l2_reg)
             info = info + '\n' + self.train_file_path + '\n' + \
                 self.test_file_path + '\n' + 'Method: Bi-LSTM NER'
-            summary_acc = tf.scalar_summary('ACC ' + info, accuracy)
-            summary_loss = tf.scalar_summary('LOSS ' + info, cost)
+            train_acc = tf.placeholder(tf.float32)
+            train_loss = tf.placeholder(tf.float32)
+            summary_acc = tf.scalar_summary('ACC ' + info, train_acc)
+            summary_loss = tf.scalar_summary('LOSS ' + info, train_loss)
             summary_op = tf.merge_summary([summary_loss, summary_acc])
 
             test_acc = tf.placeholder(tf.float32)
@@ -285,25 +287,42 @@ class Bi_LSTM_NER():
             sess.run(tf.initialize_all_variables())
             max_acc, bestIter = 0., 0
 
-            for i in xrange(self.training_iter):
+            for epoch in xrange(self.training_iter):
 
-                for train, _ in self.get_batch_data(train_x, train_y, train_lens, self.batch_size, self.Keep_Prob):
-                    _, step, summary, trans_matrix, loss, acc = sess.run(
-                        [optimizer, global_step, summary_op, self.transition, cost, accuracy], feed_dict=train)
+                for train, num in self.get_batch_data(train_x, train_y, train_lens, self.batch_size, self.Keep_Prob):
+                    _, step, trans_matrix, loss, prediction = sess.run(
+                        [optimizer, global_step, self.transition, cost, pred], feed_dict=train)
+                    correct = 0.
+                    cnt = sum(train[self.X_len])
+                    prediction = np.argmax(prediction, 2)
+                    for i in xrange(num):
+                        p_len = train[self.X_len][i]
+                        for j in xrange(p_len):
+                            if prediction[i][j] == train[self.Y][i][j]:
+                                correct += 1.0
+                    acc = correct / cnt
+                    summary = sess.run(summary_op, feed_dict={train_loss: loss, train_acc: acc})
                     train_summary_writer.add_summary(summary, step)
                     print 'Iter {}: mini-batch loss={:.6f}, acc={:.6f}'.format(step, loss, acc)
                 saver.save(sess, save_dir, global_step=step)
 
                 if i % self.display_step == 0:
-                    acc, loss, cnt = 0., 0., 0
-                    for valid, num in self.get_batch_data(valid_x, valid_y, valid_lens, len(valid_y), keep_prob=1.0):
-                        _loss, _acc = sess.run(
-                            [cost, correct_num], feed_dict=valid)
-                        acc += _acc
-                        loss += _loss * num
-                        cnt += num * self.time_steps
-                    loss = loss / cnt
-                    acc = acc / cnt
+                    loss, cnt, rd = 0., 0, 0
+                    correct = 0.0
+                    for valid, num in self.get_batch_data(valid_x, valid_y, valid_lens, self.batch_size, keep_prob=1.0):
+                        _loss, _prediction = sess.run(
+                            [cost, pred], feed_dict=valid)
+                        loss += _loss
+                        rd += 1
+                        cnt += sum(valid[self.X_len])
+                        prediction = np.argmax(_prediction, 2)
+                        for i in xrange(num):
+                            p_len = valid[self.X_len][i]
+                            for j in xrange(p_len):
+                                if prediction[i][j] == valid[self.Y][i][j]:
+                                    correct += 1.0
+                    loss = loss / rd
+                    acc = correct / cnt
                     if acc > max_acc:
                         max_acc = acc
                         bestIter = step
@@ -313,20 +332,22 @@ class Bi_LSTM_NER():
                     test_summary_writer.add_summary(summary, step)
                     print '----------{}----------'.format(time.strftime("%Y-%m-%d %X", time.localtime()))
                     print 'Iter {}: valid loss={:.6f}, valid acc={:.6f}'.format(step, loss, acc)
-                    print 'round {}: max_acc={} BestIter={}\n'.format(i, max_acc, bestIter)
+                    print 'round {}: max_acc={} BestIter={}\n'.format(epoch, max_acc, bestIter)
             print 'Optimization Finished!'
             pred_test_y = []
-            acc, loss, cnt = 0., 0., 0
-            for test, num in self.get_batch_data(test_x, test_y, test_lens, len(test_y), keep_prob=1.0):
-                prediction, trans_matrix, _loss, _acc = sess.run([pred, self.transition, cost, correct_num], feed_dict=test)
-                acc += _acc
-                loss += _loss * num
-                cnt += num * self.time_steps
-                for i in xrange(len(prediction)):
-                    seq_scores = prediction[i][:test_lens[i]]
+            loss, cnt = 0., 0
+            correct = 0.0
+            for test, num in self.get_batch_data(test_x, test_y, test_lens, self.batch_size, keep_prob=1.0, shuffle=False):
+                prediction, trans_matrix, loss, = sess.run([pred, self.transition, cost], feed_dict=test)
+                cnt += sum(test[self.X_len])
+                for i in xrange(num):
+                    p_len = test[self.X_len][i]
+                    seq_scores = prediction[i][:p_len]
                     viterbi_seq, _ = tf.contrib.crf.viterbi_decode(
                         seq_scores, trans_matrix)
                     pred_test_y.append(viterbi_seq)
-            loss = loss / cnt
-            acc = acc / cnt
+                    for j in xrange(p_len):
+                        if viterbi_seq[j] == test[self.Y][i][j]:
+                            correct += 1.0
+            acc = correct / cnt
             return pred_test_y, loss, acc
