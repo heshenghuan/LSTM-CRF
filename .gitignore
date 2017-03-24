@@ -4,6 +4,7 @@
 # log files
 *.log
 *log*
+Summary/*
 
 # embeddings files, because they are too large
 embeddings/weibo_char_vectors
