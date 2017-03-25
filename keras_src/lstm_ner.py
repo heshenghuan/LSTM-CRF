@@ -287,6 +287,9 @@ class Bi_LSTM_NER():
             sess.run(tf.initialize_all_variables())
             max_acc, bestIter = 0., 0
 
+            if self.training_iter == 0:
+                saver.restore(sess, FLAGS.restore_model)
+
             for epoch in xrange(self.training_iter):
 
                 for train, num in self.get_batch_data(train_x, train_y, train_lens, self.batch_size, self.Keep_Prob):
