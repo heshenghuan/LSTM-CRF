@@ -31,6 +31,7 @@ tf.app.flags.DEFINE_string(
     'valid_data', DATA_DIR + r'weiboNER.conll.dev', 'Validation data file')
 tf.app.flags.DEFINE_string('log_dir', LOG_DIR, 'The log dir')
 tf.app.flags.DEFINE_string('model_dir', MODEL_DIR, 'Models dir')
+tf.app.flags.DEFINE_string('restore_model', 'None', 'Path of the model to restored')
 tf.app.flags.DEFINE_string("emb_dir", EMBEDDING_DIR, "Embeddings dir")
 tf.app.flags.DEFINE_string("emb_type", "char", "Embeddings type: char/charpos")
 tf.app.flags.DEFINE_integer("emb_dim", 100, "embedding size")
@@ -220,52 +221,13 @@ def main(_):
         test_X, test_Y, test_lens,
         FLAGS)
 
+    print "Test loss: %f, accuracy: %f" % (test_loss, test_acc)
     pred_test = [pred_test[i][:test_lens[i]] for i in xrange(len(pred_test))]
     pred_test_label = convert_id_to_word(pred_test, idx2label)
-    res_test, pred_test_label = evaluate(pred_test_label, test_labels)
-    print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
+    # res_test, pred_test_label = evaluate(pred_test_label, test_labels)
+    # print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
     original_text = [[item[0] for item in sent] for sent in test_corpus]
     write_prediction(FLAGS.output_dir + 'prediction.utf8', original_text, pred_test_label)
-    # graph = tf.Graph()
-    # with graph.as_default():
-    #     model = LSTM_NER(nb_words, FLAGS.emb_dim, emb_mat, FLAGS.hidden_dim,
-    #                      FLAGS.nb_classes, FLAGS.keep_prob, FLAGS.batch_size,
-    #                      FLAGS.max_len, FLAGS.l2_reg, FLAGS.fine_tuning)
-    #     total_loss = model.loss(train_X, train_Y)
-    #     train_op = train(total_loss)
-    #     test_unary_score, test_sequence_length = model.test_unary_score()
-    #     sv = tf.train.Supervisor(graph=graph, logdir=FLAGS.log_dir)
-    #     with sv.managed_session(master='') as sess:
-    #         training_step = FLAGS.train_steps
-    #         for step in xrange(training_step):
-    #             if sv.should_stop():
-    #                 break
-    #             try:
-    #                 _, trans_matrix = sess.run([train_op, model.transition])
-    #                 if step % 100 == 0:
-    #                     print "Iter %d loss: [%r]" % (step, sess.run(total_loss))
-    #                 if step % 1000 == 0:
-    #                     test_evaluate(
-    #                         sess, test_unary_score, test_sequence_length,
-    #                         trans_matrix, model.X, valid_X, valid_Y
-    #                     )
-    #             except KeyboardInterrupt, e:
-    #                 sv.saver.save(sess, FLAGS.model_dir, global_step=step + 1)
-    #                 raise e
-    #         sv.saver.save(sess, FLAGS.model_dir + "finnal_model")
-    #         pred_test = test_evaluate(
-    #             sess, test_unary_score, test_sequence_length, trans_matrix,
-    #             model.X, test_X, test_Y
-    #         )
-    #         pred_test = [pred_test[i][:test_lens[i]] for i in xrange(len(pred_test))]
-    #         pred_test_label = convert_id_to_word(pred_test, idx2label)
-    #         res_test, pred_test_label = evaluate(pred_test_label, test_labels)
-    #         print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
-    #         original_text = [[item[0] for item in sent]
-    #                          for sent in test_corpus]
-    #         write_prediction(FLAGS.output_dir + 'prediction.utf8',
-    #                          original_text, pred_test_label)
-    #         sess.close()
 
 
 if __name__ == "__main__":
