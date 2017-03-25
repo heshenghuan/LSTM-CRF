@@ -207,5 +207,5 @@ def batch_index(length, batch_size, n_iter=100, shuffle=True):
     for j in xrange(n_iter):
         if shuffle:
             np.random.shuffle(index)
-        for i in xrange(int(length / batch_size)):
+        for i in xrange(int(length / batch_size) + 1):
             yield index[i * batch_size: (i + 1)*batch_size]
