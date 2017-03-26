@@ -224,8 +224,9 @@ def main(_):
     print "Test loss: %f, accuracy: %f" % (test_loss, test_acc)
     pred_test = [pred_test[i][:test_lens[i]] for i in xrange(len(pred_test))]
     pred_test_label = convert_id_to_word(pred_test, idx2label)
-    # res_test, pred_test_label = evaluate(pred_test_label, test_labels)
-    # print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
+    if FLAGS.eval_test:
+        res_test, pred_test_label = evaluate(pred_test_label, test_labels)
+        print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
     original_text = [[item[0] for item in sent] for sent in test_corpus]
     write_prediction(FLAGS.output_dir + 'prediction.utf8', original_text, pred_test_label)
 
