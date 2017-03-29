@@ -218,7 +218,7 @@ def conv_corpus(sentcs, labels, word2idx, label2idx, max_len=MAX_LEN):
 
     # Returns
         new_sentcs: 2D tensor of input corpus
-        new_labels: 3D tensor of input corpus's label sequences
+        new_labels: 2D tensor of input corpus's label sequences
     """
     assert len(sentcs) == len(
         labels), "The length of input sentences and labels not equal."
