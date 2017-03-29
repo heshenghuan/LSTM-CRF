@@ -11,11 +11,10 @@ import os
 import sys
 import time
 import numpy as np
-import codecs as cs
-# import cPickle as pickle
 import tensorflow as tf
 from constant import MAX_LEN
 from train_util import batch_index
+from features import templates
 
 
 class LSTM_NER():
@@ -45,7 +44,7 @@ class LSTM_NER():
 
         with tf.name_scope('inputs'):
             self.X = tf.placeholder(
-                tf.int32, shape=[None, self.time_steps], name='X_placeholder')
+                tf.int32, shape=[None, self.time_steps, len(templates)], name='X_placeholder')
             self.Y = tf.placeholder(
                 tf.int32, shape=[None, self.time_steps],
                 name='Y_placeholder')
@@ -68,6 +67,8 @@ class LSTM_NER():
 
     def inference(self, X, X_len, reuse=None):
         word_vectors = tf.nn.embedding_lookup(self.emb_matrix, X)
+        word_vectors = tf.reshape(
+            word_vectors, [-1, self.time_steps, len(templates) * self.emb_dim])
 
         with tf.variable_scope('label_inference', reuse=reuse):
             outputs, _ = tf.nn.dynamic_rnn(
@@ -79,7 +80,6 @@ class LSTM_NER():
             outputs = tf.reshape(outputs, [-1, self.hidden_dim])
 
         with tf.name_scope('softmax'):
-            # outputs = tf.nn.dropout(outputs, keep_prob=self.keep_prob)
             scores = tf.matmul(outputs, self.W) + self.b
             scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
@@ -183,7 +183,8 @@ class LSTM_NER():
                             if prediction[i][j] == train[self.Y][i][j]:
                                 correct += 1.0
                     acc = correct / cnt
-                    summary = sess.run(summary_op, feed_dict={train_loss: loss, train_acc: acc})
+                    summary = sess.run(summary_op, feed_dict={
+                                       train_loss: loss, train_acc: acc})
                     train_summary_writer.add_summary(summary, step)
                     print 'Iter {}: mini-batch loss={:.6f}, acc={:.6f}'.format(step, loss, acc)
                 saver.save(sess, save_dir, global_step=step)
@@ -220,7 +221,8 @@ class LSTM_NER():
             loss, cnt = 0., 0
             correct = 0.0
             for test, num in self.get_batch_data(test_x, test_y, test_lens, self.batch_size, keep_prob=1.0, shuffle=False):
-                prediction, trans_matrix, loss, = sess.run([pred, self.transition, cost], feed_dict=test)
+                prediction, trans_matrix, loss, = sess.run(
+                    [pred, self.transition, cost], feed_dict=test)
                 cnt += sum(test[self.X_len])
                 for i in xrange(num):
                     p_len = test[self.X_len][i]
@@ -233,7 +235,6 @@ class LSTM_NER():
                             correct += 1.0
             acc = correct / cnt
             return pred_test_y, loss, acc
-
 
 
 class Bi_LSTM_NER():
@@ -260,7 +261,7 @@ class Bi_LSTM_NER():
 
         with tf.name_scope('inputs'):
             self.X = tf.placeholder(
-                tf.int32, shape=[None, self.time_steps], name='X_placeholder')
+                tf.int32, shape=[None, self.time_steps, len(templates)], name='X_placeholder')
             self.Y = tf.placeholder(
                 tf.int32, shape=[None, self.time_steps],
                 name='Y_placeholder')
@@ -286,17 +287,11 @@ class Bi_LSTM_NER():
             self.b = tf.Variable(tf.zeros([nb_classes], name="bias"))
         return
 
-    # def length(self, data):
-    #     # 计算data句子中，非零元素的个数，也即计算句子长度
-    #     used = tf.sign(tf.reduce_max(tf.abs(data), reduction_indices=2))
-    #     length = tf.reduce_sum(used, reduction_indices=1)
-    #     length = tf.cast(length, tf.int32)
-    #     return length
-
     def inference(self, X, X_len, reuse=None):
         word_vectors = tf.nn.embedding_lookup(self.emb_matrix, X)
-        # length = self.length(word_vectors)
-        # length = np.asarray(lens, dtype='int32')
+        word_vectors = tf.reshape(
+            word_vectors, [-1, self.time_steps, len(templates) * self.emb_dim])
+
         with tf.variable_scope('label_inference', reuse=reuse):
             outputs, _ = tf.nn.bidirectional_dynamic_rnn(
                 cell_fw=self.lstm_fw,
@@ -309,22 +304,10 @@ class Bi_LSTM_NER():
             outputs = tf.reshape(outputs, [-1, self.hidden_dim * 2])
 
         with tf.name_scope('softmax'):
-            # outputs = tf.nn.dropout(outputs, keep_prob=self.keep_prob)
-            # outputs = tf.reshape(outputs, [-1, self.emb_dim])
             scores = tf.matmul(outputs, self.W) + self.b
             scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
         return scores
-
-    # def loss(self, X, Y):
-    #     pred, lens = self.inference(X)
-    #     log_likelihood, self.transition = tf.contrib.crf.crf_log_likelihood(
-    #         pred, Y, lens)
-    #     loss = tf.reduce_mean(-log_likelihood)
-    #     reg = tf.nn.l2_loss(self.emb_matrix)
-    #     reg += tf.nn.l2_loss(self.W) + tf.nn.l2_loss(self.b)
-    #     loss += reg * self.l2_reg
-    #     return loss
 
     def test_unary_score(self):
         return self.inference(self.X, reuse=True)
@@ -371,11 +354,6 @@ class Bi_LSTM_NER():
                 0, name="tr_global_step", trainable=False)
             optimizer = tf.train.AdamOptimizer(
                 learning_rate=self.learn_rate).minimize(cost, global_step=global_step)
-
-        # with tf.name_scope('predict'):
-        #     correct_pred = tf.equal(tf.argmax(pred, 2), tf.cast(self.Y, tf.int64))
-        #     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-        #     correct_num = tf.reduce_sum(tf.cast(correct_pred, tf.int32))
 
         with tf.name_scope('summary'):
             localtime = time.strftime("%X %Y-%m-%d", time.localtime())
@@ -429,7 +407,8 @@ class Bi_LSTM_NER():
                             if prediction[i][j] == train[self.Y][i][j]:
                                 correct += 1.0
                     acc = correct / cnt
-                    summary = sess.run(summary_op, feed_dict={train_loss: loss, train_acc: acc})
+                    summary = sess.run(summary_op, feed_dict={
+                                       train_loss: loss, train_acc: acc})
                     train_summary_writer.add_summary(summary, step)
                     print 'Iter {}: mini-batch loss={:.6f}, acc={:.6f}'.format(step, loss, acc)
                 saver.save(sess, save_dir, global_step=step)
@@ -466,7 +445,8 @@ class Bi_LSTM_NER():
             loss, cnt = 0., 0
             correct = 0.0
             for test, num in self.get_batch_data(test_x, test_y, test_lens, self.batch_size, keep_prob=1.0, shuffle=False):
-                prediction, trans_matrix, loss, = sess.run([pred, self.transition, cost], feed_dict=test)
+                prediction, trans_matrix, loss, = sess.run(
+                    [pred, self.transition, cost], feed_dict=test)
                 cnt += sum(test[self.X_len])
                 for i in xrange(num):
                     p_len = test[self.X_len][i]

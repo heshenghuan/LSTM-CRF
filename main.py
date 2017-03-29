@@ -19,6 +19,7 @@ from keras_src.train_util import read_matrix_from_file
 from keras_src.constant import MAX_LEN
 from keras_src.constant import MODEL_DIR, DATA_DIR, EMBEDDING_DIR, OUTPUT_DIR, LOG_DIR
 from keras_src.pretreatment import pretreatment, unfold_corpus, conv_corpus
+from keras_src.features import apply_templates, templates
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -197,6 +198,10 @@ def main(_):
                                    words2idx, label2idx, max_len=max_len)
     test_X, test_Y = conv_corpus(test_sentcs, test_labels,
                                  words2idx, label2idx, max_len=max_len)
+
+    train_X = apply_templates(train_X, templates=templates)
+    valid_X = apply_templates(valid_X, templates=templates)
+    test_X = apply_templates(test_X, templates=templates)
 
     print "#" * 67
     print "Training arguments"
