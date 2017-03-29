@@ -7,6 +7,7 @@ Created on 2017-02-22 21:11:04
 http://github.com/heshenghuan
 """
 
+import numpy as np
 
 # Separator of field values.
 separator = "\t"
@@ -21,11 +22,11 @@ templates = (
     (('w',  0), ),
     (('w',  1), ),
     (('w',  2), ),
-    (('w', -2), ('w',  -1)),
-    (('w', -1), ('w',  0)),
-    (('w',  0), ('w',  1)),
-    (('w',  1), ('w',  2)),
-    (('w',  -1), ('w',  1)),
+    # (('w', -2), ('w',  -1)),
+    # (('w', -1), ('w',  0)),
+    # (('w',  0), ('w',  1)),
+    # (('w',  1), ('w',  2)),
+    # (('w',  -1), ('w',  1)),
     )
 
 
@@ -57,7 +58,7 @@ def readiter(data, names):
     return X
 
 
-def apply_templates(X, templates):
+def apply_templates(X, templates=templates):
     """
     Generate features for an item sequence by applying feature templates.
     A feature template consists of a tuple of (name, offset) pairs,
@@ -65,25 +66,34 @@ def apply_templates(X, templates):
     the template extracts a feature value. Generated features are stored
     in the 'F' field of each item in the sequence.
 
-    @type   X:      list of mapping objects
+    @type   X:  2D tensor with shape (samples_num, sent_len)
     @param  X:      The item sequence.
     @type   template:   tuple of (str, int)
     @param  template:   The feature template.
     """
     # print 'in apply templates! input:', X
-    for template in templates:
-        name = '|'.join(['%s[%d]' % (f, o) for f, o in template])
-        for t in range(len(X)):
-            values = []
-            for field, offset in template:
-                p = t + offset
-                if p not in range(len(X)):
-                    values = []
-                    break
-                values.append(X[p][field])
-            if values:
-                X[t]['F'].append('%s=%s' % (name, '|'.join(values)))
-
+    # for template in templates:
+    #     name = '|'.join(['%s[%d]' % (f, o) for f, o in template])
+    #     for t in range(len(X)):
+    #         values = []
+    #         for field, offset in template:
+    #             p = t + offset
+    #             if p not in range(len(X)):
+    #                 values = []
+    #                 break
+    #             values.append(X[p][field])
+    #         if values:
+    #             X[t]['F'].append('%s=%s' % (name, '|'.join(values)))
+    new_X = np.zeros(X.shape + (len(templates),), dtype=np.int32)
+    for i in xrange(X.shape[0]):
+        for j in xrange(X.shape[1]):
+            for k in xrange(len(templates)):
+                ((_, offset),) = templates[k]
+                if 0 <= (j+offset) < X.shape[1]:
+                    new_X[i][j][k] = X[i][j+offset]
+                else:
+                    new_X[i][j][k] = 0
+    return new_X
 
 def escape(src):
     """
