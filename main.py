@@ -46,6 +46,8 @@ tf.app.flags.DEFINE_boolean(
     'fine_tuning', True, 'Whether fine-tuning the embeddings')
 tf.app.flags.DEFINE_boolean(
     'eval_test', True, 'Whether evaluate the test data.')
+tf.app.flags.DEFINE_boolean(
+    'test_anno', True, 'Whether the test data is labeled.')
 tf.app.flags.DEFINE_integer("max_len", MAX_LEN,
                             "max num of tokens per query")
 tf.app.flags.DEFINE_integer("nb_classes", 15, "Tagset size")
@@ -132,7 +134,7 @@ def main(_):
     train_set, valid_set, test_set, dicts, max_len = pretreatment(
         FLAGS.train_data, FLAGS.valid_data, FLAGS.test_data,
         threshold=FLAGS.ner_feature_thresh, emb_type=FLAGS.emb_type,
-        test_label=FLAGS.eval_test)
+        test_label=FLAGS.test_anno)
 
     # Reset the maximum sentence's length
     max_len = max(MAX_LEN, max_len)
@@ -192,6 +194,7 @@ def main(_):
     # idx2words = dict((k, v) for v, k in FLAGS.words2idx.iteritems())
 
     # convert corpus from string to it's own index seq with post padding 0
+    print "Preparing training, validate and testing data."
     train_X, train_Y = conv_corpus(train_sentcs, train_labels,
                                    words2idx, label2idx, max_len=max_len)
     valid_X, valid_Y = conv_corpus(valid_sentcs, valid_labels,
