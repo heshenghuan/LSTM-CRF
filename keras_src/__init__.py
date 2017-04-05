@@ -9,3 +9,5 @@ http://github.com/heshenghuan
 
 __all__ = ['lstm_ner', 'neural_lib', 'train_util',
            'evaluate_util', 'pretreatment', 'constant', 'features']
+
+__version__ = '0.1.0'
