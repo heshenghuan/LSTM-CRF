@@ -135,9 +135,11 @@ All of those embeddings are trained on a large corpus of Weibo messages.
 
 ## History
 
+- **2017-04-08 ver 0.1.1**
+  - Rewrite class lstm-ner & bi-lstm-ner.
 - **2017-03-03 ver 0.1.0**
   - Using tensorflow to implement the LSTM-NER model.
-  - Basical functino finished.
+  - Basical function finished.
 - **2017-02-26 ver 0.0.3**
   - lstm_ner basically completed.
   - viterbi decoding algorithm and sequence labeling.
