@@ -135,6 +135,9 @@ All of those embeddings are trained on a large corpus of Weibo messages.
 
 ## History
 
+- **2017-04-11 ver 0.1.2**
+  - Rewrite neural_tagger class method: loss.
+  - Add a new tagger based Bi-LSTM + CNNs, where CNN used to extract bigram features.
 - **2017-04-08 ver 0.1.1**
   - Rewrite class lstm-ner & bi-lstm-ner.
 - **2017-03-03 ver 0.1.0**
