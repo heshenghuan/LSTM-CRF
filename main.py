@@ -13,7 +13,7 @@ import random
 import numpy as np
 import codecs as cs
 import tensorflow as tf
-from keras_src.lstm_ner import LSTM_NER, Bi_LSTM_NER
+import keras_src.lstm_ner as tagger
 from keras_src.evaluate_util import eval_ner
 from keras_src.train_util import read_matrix_from_file
 from keras_src.constant import MAX_LEN
@@ -32,7 +32,8 @@ tf.app.flags.DEFINE_string(
     'valid_data', DATA_DIR + r'weiboNER.conll.dev', 'Validation data file')
 tf.app.flags.DEFINE_string('log_dir', LOG_DIR, 'The log dir')
 tf.app.flags.DEFINE_string('model_dir', MODEL_DIR, 'Models dir')
-tf.app.flags.DEFINE_string('restore_model', 'None', 'Path of the model to restored')
+tf.app.flags.DEFINE_string('restore_model', 'None',
+                           'Path of the model to restored')
 tf.app.flags.DEFINE_string("emb_dir", EMBEDDING_DIR, "Embeddings dir")
 tf.app.flags.DEFINE_string("emb_type", "char", "Embeddings type: char/charpos")
 tf.app.flags.DEFINE_integer("emb_dim", 100, "embedding size")
@@ -219,9 +220,15 @@ def main(_):
     print "#" * 67
     print "Training process start."
     print "#" * 67
-    model = Bi_LSTM_NER(nb_words, FLAGS.emb_dim, emb_mat, FLAGS.hidden_dim,
-                        FLAGS.nb_classes, FLAGS.keep_prob, FLAGS.batch_size,
-                        FLAGS.max_len, FLAGS.l2_reg, FLAGS.fine_tuning)
+    # model = tagger.Bi_LSTM_NER(
+    #     nb_words, FLAGS.emb_dim, emb_mat, FLAGS.hidden_dim, FLAGS.nb_classes,
+    #     FLAGS.keep_prob, FLAGS.batch_size, FLAGS.max_len, FLAGS.l2_reg,
+    #     FLAGS.fine_tuning)
+
+    model = tagger.CNN_Bi_LSTM_NER(
+        nb_words, FLAGS.emb_dim, emb_mat, FLAGS.hidden_dim, FLAGS.nb_classes,
+        FLAGS.keep_prob, FLAGS.batch_size, FLAGS.max_len, FLAGS.l2_reg,
+        FLAGS.fine_tuning)
 
     pred_test, test_loss, test_acc = model.run(
         train_X, train_Y, train_lens,
@@ -236,7 +243,8 @@ def main(_):
         res_test, pred_test_label = evaluate(pred_test_label, test_labels)
         print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
     original_text = [[item[0] for item in sent] for sent in test_corpus]
-    write_prediction(FLAGS.output_dir + 'prediction.utf8', original_text, pred_test_label)
+    write_prediction(FLAGS.output_dir + 'prediction.utf8',
+                     original_text, pred_test_label)
 
 
 if __name__ == "__main__":
