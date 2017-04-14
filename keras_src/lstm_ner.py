@@ -250,7 +250,7 @@ class LSTM_NER(neural_tagger):
 
         with tf.variable_scope('label_inference', reuse=reuse):
             outputs, _ = tf.nn.dynamic_rnn(
-                self.lstm_layer,
+                self.lstm_fw,
                 word_vectors,
                 dtype=tf.float32,
                 sequence_length=X_len
