@@ -138,7 +138,7 @@ def main(_):
         test_label=FLAGS.test_anno)
 
     # Reset the maximum sentence's length
-    max_len = max(MAX_LEN, max_len)
+    # max_len = max(MAX_LEN, max_len)
     FLAGS.max_len = max_len
 
     # unfold these corpus
