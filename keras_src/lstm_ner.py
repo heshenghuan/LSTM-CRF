@@ -57,7 +57,7 @@ class neural_tagger():
         self.build()
         return
 
-    def build():
+    def build(self):
         pass
 
     def inference(self, X, X_len, reuse=None):
