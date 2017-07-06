@@ -23,6 +23,22 @@ def init_variable(shape, name=None):
 
 
 class neural_tagger():
+    """
+    A tensorflow sequence labelling tagger.
+    Use the 'build' method to customize the network structure of tagger.
+
+    Example:
+    1. LSTM + CRF: see class 'LSTM_NER'
+    2. Bi-LSTM + CRF: see class 'Bi_LSTM_NER'
+
+    Use the 'inference' method to define how to calculate
+    unary scores of given word sequence.
+
+    Inherit this class and overwrite 'build' & 'inference', you can customize
+    structure of your tagger.
+
+    Then use 'run' method to training.
+    """
 
     def __init__(self, nb_words, emb_dim, emb_matrix, hidden_dim, nb_classes,
                  keep_prob=1.0, batch_size=None, time_steps=MAX_LEN,
@@ -73,7 +89,25 @@ class neural_tagger():
             }
             yield feed_dict, len(index)
 
+    def accuracy(self, num, pred, y, y_lens, trans_matrix):
+        """
+        Given predicted unary_scores, using viterbi_decode find the best tags
+        sequence. Then count the correct labels and total labels.
+        """
+        correct_labels = 0
+        total_labels = 0
+        for i in xrange(num):
+            p_len = y_lens[i]
+            unary_scores = pred[i][:p_len]
+            gold = y[i][:p_len]
+            tags_seq, _ = tf.contrib.crf.viterbi_decode(
+                unary_scores, trans_matrix)
+            correct_labels += np.sum(np.equal(tags_seq, gold))
+            total_labels += p_len
+        return (correct_labels, total_labels)
+
     def test_unary_score(self):
+        """This method is deprecated."""
         return self.inference(self.X, reuse=True)
 
     def loss(self, pred):
@@ -103,16 +137,9 @@ class neural_tagger():
         self.train_file_path = FLAGS.train_data
         self.test_file_path = FLAGS.valid_data
         self.display_step = FLAGS.display_step
-        pred = self.inference(self.X, self.X_len)
 
-        # with tf.name_scope('loss'):
-        #     log_likelihood, self.transition = tf.contrib.crf.crf_log_likelihood(
-        #         pred, self.Y, self.X_len)
-        #     cost = tf.reduce_mean(-log_likelihood)
-        #     reg = tf.nn.l2_loss(self.W) + tf.nn.l2_loss(self.b)
-        #     if self.fine_tuning:
-        #         reg += tf.nn.l2_loss(self.emb_matrix)
-        #     cost += reg * self.l2_reg
+        # unary_scores & loss
+        pred = self.inference(self.X, self.X_len)
         cost = self.loss(pred)
 
         with tf.name_scope('train'):
@@ -162,40 +189,33 @@ class neural_tagger():
             for epoch in xrange(self.training_iter):
 
                 for train, num in self.get_batch_data(train_x, train_y, train_lens, self.batch_size, self.Keep_Prob):
-                    _, step, trans_matrix, loss, prediction = sess.run(
-                        [optimizer, global_step, self.transition, cost, pred], feed_dict=train)
-                    correct = 0.
-                    cnt = sum(train[self.X_len])
-                    prediction = np.argmax(prediction, 2)
-                    for i in xrange(num):
-                        p_len = train[self.X_len][i]
-                        for j in xrange(p_len):
-                            if prediction[i][j] == train[self.Y][i][j]:
-                                correct += 1.0
-                    acc = correct / cnt
+                    _, step, trans_matrix, loss, predication = sess.run(
+                        [optimizer, global_step, self.transition, cost, pred],
+                        feed_dict=train)
+                    correct, total = self.accuracy(
+                        num, predication, train[self.Y],
+                        train[self.X_len], trans_matrix)
+                    acc = float(correct) / total
                     summary = sess.run(summary_op, feed_dict={
                                        train_loss: loss, train_acc: acc})
                     train_summary_writer.add_summary(summary, step)
                     print 'Iter {}: mini-batch loss={:.6f}, acc={:.6f}'.format(step, loss, acc)
                 saver.save(sess, save_dir, global_step=step)
 
-                if i % self.display_step == 0:
-                    loss, cnt, rd = 0., 0, 0
-                    correct = 0.0
+                if epoch % self.display_step == 0:
+                    rd, loss, correct, total = 0, 0., 0, 0
                     for valid, num in self.get_batch_data(valid_x, valid_y, valid_lens, self.batch_size, keep_prob=1.0):
-                        _loss, _prediction = sess.run(
-                            [cost, pred], feed_dict=valid)
+                        trans_matrix, _loss, predication = sess.run(
+                            [self.transition, cost, pred], feed_dict=valid)
                         loss += _loss
+                        tmp = self.accuracy(
+                            num, predication, valid[self.Y],
+                            valid[self.X_len], trans_matrix)
+                        correct += tmp[0]
+                        total += tmp[1]
                         rd += 1
-                        cnt += sum(valid[self.X_len])
-                        prediction = np.argmax(_prediction, 2)
-                        for i in xrange(num):
-                            p_len = valid[self.X_len][i]
-                            for j in xrange(p_len):
-                                if prediction[i][j] == valid[self.Y][i][j]:
-                                    correct += 1.0
-                    loss = loss / rd
-                    acc = correct / cnt
+                    loss /= rd
+                    acc = float(correct) / total
                     if acc > max_acc:
                         max_acc = acc
                         bestIter = step
@@ -208,22 +228,24 @@ class neural_tagger():
                     print 'round {}: max_acc={} BestIter={}\n'.format(epoch, max_acc, bestIter)
             print 'Optimization Finished!'
             pred_test_y = []
-            loss, cnt = 0., 0
-            correct = 0.0
+            loss, rd = 0., 0
+            correct_labels, total_labels = 0, 0
             for test, num in self.get_batch_data(test_x, test_y, test_lens, self.batch_size, keep_prob=1.0, shuffle=False):
-                prediction, trans_matrix, loss, = sess.run(
-                    [pred, self.transition, cost], feed_dict=test)
-                cnt += sum(test[self.X_len])
+                trans_matrix, _loss, predication = sess.run(
+                    [self.transition, cost, pred], feed_dict=test)
+                loss += _loss
+                rd += 1
                 for i in xrange(num):
                     p_len = test[self.X_len][i]
-                    seq_scores = prediction[i][:p_len]
-                    viterbi_seq, _ = tf.contrib.crf.viterbi_decode(
-                        seq_scores, trans_matrix)
-                    pred_test_y.append(viterbi_seq)
-                    for j in xrange(p_len):
-                        if viterbi_seq[j] == test[self.Y][i][j]:
-                            correct += 1.0
-            acc = correct / cnt
+                    unary_scores = predication[i][:p_len]
+                    gold = test[self.Y][i][:p_len]
+                    tags_seq, _ = tf.contrib.crf.viterbi_decode(
+                        unary_scores, trans_matrix)
+                    correct_labels += np.sum(np.equal(tags_seq, gold))
+                    total_labels += p_len
+                    pred_test_y.append(tags_seq)
+            acc = float(correct_labels) / total_labels
+            loss /= rd
             return pred_test_y, loss, acc
 
 
@@ -234,8 +256,7 @@ class LSTM_NER(neural_tagger):
             self.W = tf.get_variable(
                 shape=[self.hidden_dim, self.nb_classes],
                 initializer=tf.truncated_normal_initializer(stddev=0.01),
-                name='weights',
-                regularizer=tf.contrib.layers.l2_regularizer(0.001)
+                name='weights'
             )
             self.lstm_fw = tf.nn.rnn_cell.LSTMCell(self.hidden_dim)
 
@@ -260,7 +281,7 @@ class LSTM_NER(neural_tagger):
 
         with tf.name_scope('softmax'):
             scores = tf.matmul(outputs, self.W) + self.b
-            scores = tf.nn.softmax(scores)
+            # scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
         return scores
 
@@ -272,8 +293,7 @@ class Bi_LSTM_NER(neural_tagger):
             self.W = tf.get_variable(
                 shape=[self.hidden_dim * 2, self.nb_classes],
                 initializer=tf.truncated_normal_initializer(stddev=0.01),
-                name='weights',
-                regularizer=tf.contrib.layers.l2_regularizer(0.001)
+                name='weights'
             )
             self.lstm_fw = tf.nn.rnn_cell.LSTMCell(self.hidden_dim)
             self.lstm_bw = tf.nn.rnn_cell.LSTMCell(self.hidden_dim)
@@ -301,7 +321,7 @@ class Bi_LSTM_NER(neural_tagger):
 
         with tf.name_scope('softmax'):
             scores = tf.matmul(outputs, self.W) + self.b
-            scores = tf.nn.softmax(scores)
+            # scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
         return scores
 
@@ -313,8 +333,7 @@ class CNN_Bi_LSTM_NER(neural_tagger):
             self.W = tf.get_variable(
                 shape=[self.hidden_dim * 2, self.nb_classes],
                 initializer=tf.truncated_normal_initializer(stddev=0.01),
-                name='weights',
-                regularizer=tf.contrib.layers.l2_regularizer(0.001)
+                name='weights'
             )
             self.lstm_fw = tf.nn.rnn_cell.LSTMCell(self.hidden_dim)
             self.lstm_bw = tf.nn.rnn_cell.LSTMCell(self.hidden_dim)
@@ -362,7 +381,7 @@ class CNN_Bi_LSTM_NER(neural_tagger):
 
         with tf.name_scope('softmax'):
             scores = tf.matmul(outputs, self.W) + self.b
-            scores = tf.nn.softmax(scores)
+            # scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
         return scores
 
