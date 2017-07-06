@@ -34,8 +34,10 @@ tf.app.flags.DEFINE_string('log_dir', LOG_DIR, 'The log dir')
 tf.app.flags.DEFINE_string('model_dir', MODEL_DIR, 'Models dir')
 tf.app.flags.DEFINE_string('restore_model', 'None',
                            'Path of the model to restored')
-tf.app.flags.DEFINE_string("emb_dir", EMBEDDING_DIR, "Embeddings dir")
+# tf.app.flags.DEFINE_string("emb_dir", EMBEDDING_DIR, "Embeddings dir")
 tf.app.flags.DEFINE_string("emb_type", "char", "Embeddings type: char/charpos")
+tf.app.flags.DEFINE_string(
+    "emb_file", EMBEDDING_DIR + "/weibo_charpos_vectors", "Embeddings file")
 tf.app.flags.DEFINE_integer("emb_dim", 100, "embedding size")
 tf.app.flags.DEFINE_string("output_dir", OUTPUT_DIR, "Output dir")
 tf.app.flags.DEFINE_string(
@@ -181,11 +183,11 @@ def main(_):
 
     # load embeddings from file
     print "#" * 67
-    print "# Reading embeddings from file."
-    print "#" * 67
-    print "Read embedding type: %s" % (FLAGS.emb_type)
-    emb_file = EMBEDDING_DIR + 'weibo_%s_vectors' % (FLAGS.emb_type)
-    emb_mat, idx_map = read_matrix_from_file(emb_file, words2idx)
+    print "# Reading embeddings from file: %s" % (FLAGS.emb_file)
+    # print "#" * 67
+    # print "Read embedding type: %s" % (FLAGS.emb_type)
+    # emb_file = EMBEDDING_DIR + 'weibo_%s_vectors' % (FLAGS.emb_type)
+    emb_mat, idx_map = read_matrix_from_file(FLAGS.emb_file, words2idx)
     FLAGS.emb_dim = max(emb_mat.shape[1], FLAGS.emb_dim)
     print "embeddings' size:", emb_mat.shape
     if FLAGS.fine_tuning:
