@@ -57,15 +57,16 @@ python main.py -h
 Using TensorFlow backend.
 usage: main.py [-h] [--train_data TRAIN_DATA] [--test_data TEST_DATA]
                [--valid_data VALID_DATA] [--log_dir LOG_DIR]
-               [--model_dir MODEL_DIR] [--emb_dir EMB_DIR]
-               [--emb_type EMB_TYPE] [--emb_dim EMB_DIM]
+               [--model_dir MODEL_DIR] [--restore_model RESTORE_MODEL]
+               [--emb_type EMB_TYPE] [--emb_file EMB_FILE] [--emb_dim EMB_DIM]
                [--output_dir OUTPUT_DIR]
                [--ner_feature_thresh NER_FEATURE_THRESH] [--lr LR]
                [--keep_prob KEEP_PROB] [--fine_tuning [FINE_TUNING]]
                [--nofine_tuning] [--eval_test [EVAL_TEST]] [--noeval_test]
-               [--max_len MAX_LEN] [--nb_classes NB_CLASSES]
-               [--hidden_dim HIDDEN_DIM] [--batch_size BATCH_SIZE]
-               [--train_steps TRAIN_STEPS] [--l2_reg L2_REG]
+               [--test_anno [TEST_ANNO]] [--notest_anno] [--max_len MAX_LEN]
+               [--nb_classes NB_CLASSES] [--hidden_dim HIDDEN_DIM]
+               [--batch_size BATCH_SIZE] [--train_steps TRAIN_STEPS]
+               [--display_step DISPLAY_STEP] [--l2_reg L2_REG]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -78,8 +79,10 @@ optional arguments:
   --log_dir LOG_DIR     The log dir
   --model_dir MODEL_DIR
                         Models dir
-  --emb_dir EMB_DIR     Embeddings dir
+  --restore_model RESTORE_MODEL
+                        Path of the model to restored
   --emb_type EMB_TYPE   Embeddings type: char/charpos
+  --emb_file EMB_FILE   Embeddings file
   --emb_dim EMB_DIM     embedding size
   --output_dir OUTPUT_DIR
                         Output dir
@@ -94,15 +97,20 @@ optional arguments:
   --eval_test [EVAL_TEST]
                         Whether evaluate the test data.
   --noeval_test
+  --test_anno [TEST_ANNO]
+                        Whether the test data is labeled.
+  --notest_anno
   --max_len MAX_LEN     max num of tokens per query
   --nb_classes NB_CLASSES
-                        BMES
+                        Tagset size
   --hidden_dim HIDDEN_DIM
                         hidden unit number
   --batch_size BATCH_SIZE
                         num example per mini batch
   --train_steps TRAIN_STEPS
                         trainning steps
+  --display_step DISPLAY_STEP
+                        number of test display step
   --l2_reg L2_REG       L2 regularization weight
 ```
 
@@ -135,6 +143,10 @@ All of those embeddings are trained on a large corpus of Weibo messages.
 
 ## History
 
+- **2017-07-06 ver 0.1.3**
+  - Add new method 'accuracy', which used to calculate correct labels
+  - Arguments 'emb\_type' & 'emb\_dir' now are deprecated.
+  - New argument 'emb_file'
 - **2017-04-11 ver 0.1.2**
   - Rewrite neural_tagger class method: loss.
   - Add a new tagger based Bi-LSTM + CNNs, where CNN used to extract bigram features.
