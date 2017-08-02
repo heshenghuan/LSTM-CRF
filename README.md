@@ -26,6 +26,37 @@ An implementation of LSTM named entity recognition based on Keras. Using two kin
 >  year={2015} 
 >  }
 
+## Data Format
+
+The data format is basically consistent with the CRF++ toolkit. Generally speaking, training and test file must consist of multiple tokens. In addition, a token consists of multiple (but fixed-numbers) columns. Each token must be represented in one line, with the columns separated by white space (spaces or tabular characters). A sequence of token becomes a sentence. (So far, this program only supports data with 3-columns.)
+
+To identify the boundary between sentences, an empty line is put.
+
+Here's an example of such a file: (data for Chinese NER)
+
+```
+...
+感	O
+动	O
+了	O
+李	B-PER.NAM
+开	I-PER.NAM
+复	I-PER.NAM
+感	O
+动	O
+
+回	O
+复	O
+支	O
+持	O
+...
+```
+
+## Embeddings
+
+This program supports word/char embeddings input. When running this program, you should give a embedding file(word2vec standard output format) by specific argument.
+
+
 ## Usage
 
 ### Some Constants
