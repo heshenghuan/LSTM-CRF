@@ -7,19 +7,16 @@ Created on 2017-02-20 16:28:53
 http://github.com/heshenghuan
 """
 
-import os
-import sys
 import random
 import numpy as np
 import codecs as cs
 import tensorflow as tf
-import keras_src.lstm_ner as tagger
-from keras_src.evaluate_util import eval_ner
-from keras_src.train_util import read_matrix_from_file
-from keras_src.constant import MAX_LEN
-from keras_src.constant import MODEL_DIR, DATA_DIR, EMBEDDING_DIR, OUTPUT_DIR, LOG_DIR
-from keras_src.pretreatment import pretreatment, unfold_corpus, conv_corpus
-from keras_src.features import apply_templates, templates
+import model as tagger
+from lib.parameters import MAX_LEN
+from lib.features import Template
+from lib.utils import eval_ner, read_emb_from_file
+from lib.pretreatment import pretreatment, unfold_corpus, conv_corpus, read_corpus
+from env_settings import MODEL_DIR, DATA_DIR, EMB_DIR, OUTPUT_DIR, LOG_DIR
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -32,25 +29,23 @@ tf.app.flags.DEFINE_string(
     'valid_data', DATA_DIR + r'weiboNER.conll.dev', 'Validation data file')
 tf.app.flags.DEFINE_string('log_dir', LOG_DIR, 'The log dir')
 tf.app.flags.DEFINE_string('model_dir', MODEL_DIR, 'Models dir')
+tf.app.flags.DEFINE_string(
+    'model', "LSTM", 'Model type: LSTM/BLSTM/CNNBLSTM')
 tf.app.flags.DEFINE_string('restore_model', 'None',
                            'Path of the model to restored')
-# tf.app.flags.DEFINE_string("emb_dir", EMBEDDING_DIR, "Embeddings dir")
-tf.app.flags.DEFINE_string("emb_type", "char", "Embeddings type: char/charpos")
 tf.app.flags.DEFINE_string(
-    "emb_file", EMBEDDING_DIR + "/weibo_charpos_vectors", "Embeddings file")
+    "emb_file", EMB_DIR + "/weibo_charpos_vectors", "Embeddings file")
 tf.app.flags.DEFINE_integer("emb_dim", 100, "embedding size")
 tf.app.flags.DEFINE_string("output_dir", OUTPUT_DIR, "Output dir")
-tf.app.flags.DEFINE_string(
-    "ner_feature_thresh", 0, "The minimum count OOV threshold for NER")
-# tf.app.flags.DEFINE_boolean('only_test', False, 'Only do the test')
+tf.app.flags.DEFINE_boolean('only_test', False, 'Only do the test')
 tf.app.flags.DEFINE_float("lr", 0.002, "learning rate")
-tf.app.flags.DEFINE_float("keep_prob", 1., "dropout rate of hidden layer")
+tf.app.flags.DEFINE_float("dropout", 0., "Dropout rate of input layer")
 tf.app.flags.DEFINE_boolean(
     'fine_tuning', True, 'Whether fine-tuning the embeddings')
 tf.app.flags.DEFINE_boolean(
     'eval_test', True, 'Whether evaluate the test data.')
-tf.app.flags.DEFINE_boolean(
-    'test_anno', True, 'Whether the test data is labeled.')
+# tf.app.flags.DEFINE_boolean(
+#     'test_anno', True, 'Whether the test data is labeled.')
 tf.app.flags.DEFINE_integer("max_len", MAX_LEN,
                             "max num of tokens per query")
 tf.app.flags.DEFINE_integer("nb_classes", 15, "Tagset size")
@@ -59,12 +54,14 @@ tf.app.flags.DEFINE_integer("batch_size", 200, "num example per mini batch")
 tf.app.flags.DEFINE_integer("train_steps", 50, "trainning steps")
 tf.app.flags.DEFINE_integer("display_step", 1, "number of test display step")
 tf.app.flags.DEFINE_float("l2_reg", 0.0001, "L2 regularization weight")
+tf.app.flags.DEFINE_boolean(
+    'log', True, 'Whether to record the TensorBoard log.')
+tf.app.flags.DEFINE_string("template", r"template", "Feature templates")
 
 
-def convert_id_to_word(corpus, idx2label):
-    return [[idx2label.get(word, 'O') for word in sentence]
-            for sentence
-            in corpus]
+def convert_id_to_word(corpus, idx2label, default='O'):
+    return [[idx2label.get(word, default) for word in sentence]
+            for sentence in corpus]
 
 
 def evaluate(predictions, groundtruth=None):
@@ -86,46 +83,134 @@ def write_prediction(filename, lex_test, pred_test):
             outf.write('\n')
 
 
-def test_evaluate(sess, unary_score, test_sequence_length, transMatrix, inp,
-                  tX, tY):
-    totalEqual = 0
-    batchSize = FLAGS.batch_size
-    totalLen = tX.shape[0]
-    numBatch = int((tX.shape[0] - 1) / batchSize) + 1
-    correct_labels = 0
-    total_labels = 0
-    pred_labels = []
-    for i in range(numBatch):
-        endOff = (i + 1) * batchSize
-        if endOff > totalLen:
-            endOff = totalLen
-        y = tY[i * batchSize:endOff]
-        feed_dict = {inp: tX[i * batchSize:endOff]}
-        unary_score_val, test_sequence_length_val = sess.run(
-            [unary_score, test_sequence_length], feed_dict)
-        for tf_unary_scores_, y_, sequence_length_ in zip(
-                unary_score_val, y, test_sequence_length_val):
-            # print("seg len:%d" % (sequence_length_))
-            tf_unary_scores_ = tf_unary_scores_[:sequence_length_]
-            y_ = y_[:sequence_length_]
-            viterbi_sequence, _ = tf.contrib.crf.viterbi_decode(
-                tf_unary_scores_, transMatrix)
-            # Evaluate word-level accuracy.
-            pred_labels.append(viterbi_sequence)
-            correct_labels += np.sum(np.equal(viterbi_sequence, y_))
-            total_labels += sequence_length_
-    accuracy = 100.0 * correct_labels / float(total_labels)
-    print("Accuracy: %.2f%%" % accuracy)
-    return pred_labels
+def save_dicts(path, feats2idx, words2idx, label2idx):
+    with cs.open(path + 'FEATS', 'w', 'utf-8') as out:
+        for k, v in feats2idx.iteritems():
+            out.write("%s %d\n" % (k, v))
+
+    with cs.open(path + 'WORDS', 'w', 'utf-8') as out:
+        for k, v in words2idx.iteritems():
+            out.write("%s %d\n" % (k, v))
+
+    with cs.open(path + 'LABEL', 'w', 'utf-8') as out:
+        for k, v in label2idx.iteritems():
+            out.write("%s %d\n" % (k, v))
 
 
-def train(total_loss):
-    return tf.train.AdamOptimizer(FLAGS.lr).minimize(total_loss)
+def load_dicts(path):
+    feats2idx = {}
+    words2idx = {}
+    label2idx = {}
+    with cs.open(path + 'FEATS', 'r', 'utf-8') as src:
+        items = src.read().strip().split('\n')
+        for item in items:
+            k, v = item.strip().split()
+            feats2idx[k] = int(v)
+
+    with cs.open(path + 'WORDS', 'r', 'utf-8') as src:
+        items = src.read().strip().split('\n')
+        for item in items:
+            k, v = item.strip().split()
+            words2idx[k] = int(v)
+
+    with cs.open(path + 'LABEL', 'r', 'utf-8') as src:
+        items = src.read().strip().split('\n')
+        for item in items:
+            k, v = item.strip().split()
+            label2idx[k] = int(v)
+
+    return feats2idx, words2idx, label2idx
+
+
+def test(FLAGS):
+    print "#" * 67
+    print "# Loading data from:"
+    print "#" * 67
+    print "Test: ", FLAGS.test_data
+
+    # Load feature templates
+    template = Template(FLAGS.template)
+
+    # Load dicts
+    feats2idx, words2idx, label2idx = load_dicts(
+        FLAGS.output_dir)
+    idx2label = dict((k, v) for v, k in label2idx.iteritems())
+
+    # load embeddings from file
+    print "#" * 67
+    print "# Reading embeddings from file: %s" % (FLAGS.emb_file)
+    emb_mat, idx_map = read_emb_from_file(FLAGS.emb_file, words2idx)
+    FLAGS.emb_dim = max(emb_mat.shape[1], FLAGS.emb_dim)
+    print "embeddings' size:", emb_mat.shape
+    if FLAGS.fine_tuning:
+        print "The embeddings will be fine-tuned!"
+
+    # Read test corpus
+    test_corpus, test_lens, test_max_len = read_corpus(
+        FLAGS.test_data, template)
+
+    # neural network's output_dim
+    FLAGS.max_len = test_max_len
+    FLAGS.feat_size = len(feats2idx)
+    FLAGS.nb_classes = len(label2idx) + 1
+
+    # Embedding layer's input_dim
+    nb_words = len(words2idx)
+    FLAGS.nb_words = nb_words
+    FLAGS.in_dim = FLAGS.nb_words + 1
+
+    test_sentcs, test_featvs, test_labels = unfold_corpus(test_corpus)
+
+    print "Lexical word size:     %d" % len(words2idx)
+    print "Label size:            %d" % len(label2idx)
+    print "Features size:         %d" % len(feats2idx)
+    print "-------------------------------------------------------------------"
+    print "Test data size:        %d" % len(test_corpus)
+    print "Maximum sentence len:  %d" % FLAGS.max_len
+
+    test_X, test_F, test_Y = conv_corpus(
+        test_sentcs, test_featvs, test_labels,
+        words2idx, feats2idx, label2idx, max_len=FLAGS.max_len)
+
+    if FLAGS.model == 'LSTM':
+        Model_type = tagger.LSTM_NER
+    elif FLAGS.model == 'BLSTM':
+        Model_type = tagger.Bi_LSTM_NER
+    elif FLAGS.model == 'CNNBLSTM':
+        Model_type = tagger.CNN_Bi_LSTM_NER
+    else:
+        raise TypeError("Unknow model type % " % FLAGS.model)
+
+    model = Model_type(
+        nb_words, FLAGS.emb_dim, emb_mat, FLAGS.hidden_dim,
+        FLAGS.nb_classes, FLAGS.dropout, FLAGS.batch_size,
+        FLAGS.max_len, len(template.template), FLAGS.l2_reg,
+        FLAGS.fine_tuning)
+
+    pred_test, test_loss, test_acc = model.run(
+        None, None, None,
+        None, None, None,
+        test_F, test_Y, test_lens,
+        FLAGS)
+
+    print "Test loss: %f, accuracy: %f" % (test_loss, test_acc)
+    pred_test = [pred_test[i][:test_lens[i]] for i in xrange(len(pred_test))]
+    pred_test_label = convert_id_to_word(pred_test, idx2label)
+    if FLAGS.eval_test:
+        res_test, pred_test_label = evaluate(pred_test_label, test_labels)
+        print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
+    write_prediction(FLAGS.output_dir + 'prediction.utf8',
+                     test_sentcs, pred_test_label)
 
 
 def main(_):
     np.random.seed(1337)
     random.seed(1337)
+
+    if FLAGS.only_test or FLAGS.train_steps == 0:
+        FLAGS.train_steps = 0
+        test(FLAGS)
+        return
 
     print "#" * 67
     print "# Loading data from:"
@@ -133,11 +218,13 @@ def main(_):
     print "Train:", FLAGS.train_data
     print "Valid:", FLAGS.valid_data
     print "Test: ", FLAGS.test_data
+
+    # Choose fields templates & features templates
+    template = Template(FLAGS.template, suffix=False)
     # pretreatment process: read, split and create vocabularies
     train_set, valid_set, test_set, dicts, max_len = pretreatment(
         FLAGS.train_data, FLAGS.valid_data, FLAGS.test_data,
-        threshold=FLAGS.ner_feature_thresh, emb_type=FLAGS.emb_type,
-        test_label=FLAGS.test_anno)
+        threshold=0, template=template)
 
     # Reset the maximum sentence's length
     # max_len = max(MAX_LEN, max_len)
@@ -147,9 +234,9 @@ def main(_):
     train_corpus, train_lens = train_set
     valid_corpus, valid_lens = valid_set
     test_corpus, test_lens = test_set
-    train_sentcs, train_labels = unfold_corpus(train_corpus)
-    valid_sentcs, valid_labels = unfold_corpus(valid_corpus)
-    test_sentcs, test_labels = unfold_corpus(test_corpus)
+    train_sentcs, train_featvs, train_labels = unfold_corpus(train_corpus)
+    valid_sentcs, valid_featvs, valid_labels = unfold_corpus(valid_corpus)
+    test_sentcs, test_featvs, test_labels = unfold_corpus(test_corpus)
 
     # vocabularies
     feats2idx = dicts['feats2idx']
@@ -159,7 +246,7 @@ def main(_):
     FLAGS.words2idx = words2idx
     FLAGS.feats2idx = feats2idx
 
-    print "Lexical word size:     %d" % len(words2idx)
+    print "Lexical word size:     %d" % len(feats2idx)
     print "Label size:            %d" % len(label2idx)
     print "-------------------------------------------------------------------"
     print "Training data size:    %d" % len(train_corpus)
@@ -167,27 +254,23 @@ def main(_):
     print "Test data size:        %d" % len(test_corpus)
     print "Maximum sentence len:  %d" % FLAGS.max_len
 
-    # generate the transition and initial probability matrices
-    # inits, trans = generate_prb(FLAGS.train_data, label2idx)
-    # FLAGS.inits = inits
-    # FLAGS.trans = trans
+    del train_corpus
+    del valid_corpus
+    del test_corpus
 
     # neural network's output_dim
-    nb_classes = len(label2idx) + 1
-    FLAGS.nb_classes = max(nb_classes, FLAGS.nb_classes)
+    nb_classes = len(label2idx)
+    FLAGS.nb_classes = nb_classes + 1
 
     # Embedding layer's input_dim
     nb_words = len(words2idx)
-    # FLAGS.nb_words = nb_words
-    # FLAGS.in_dim = FLAGS.nb_words + 1
+    FLAGS.nb_words = nb_words
+    FLAGS.in_dim = FLAGS.nb_words + 1
 
     # load embeddings from file
     print "#" * 67
     print "# Reading embeddings from file: %s" % (FLAGS.emb_file)
-    # print "#" * 67
-    # print "Read embedding type: %s" % (FLAGS.emb_type)
-    # emb_file = EMBEDDING_DIR + 'weibo_%s_vectors' % (FLAGS.emb_type)
-    emb_mat, idx_map = read_matrix_from_file(FLAGS.emb_file, words2idx)
+    emb_mat, idx_map = read_emb_from_file(FLAGS.emb_file, words2idx)
     FLAGS.emb_dim = max(emb_mat.shape[1], FLAGS.emb_dim)
     print "embeddings' size:", emb_mat.shape
     if FLAGS.fine_tuning:
@@ -198,16 +281,19 @@ def main(_):
 
     # convert corpus from string to it's own index seq with post padding 0
     print "Preparing training, validate and testing data."
-    train_X, train_Y = conv_corpus(train_sentcs, train_labels,
-                                   words2idx, label2idx, max_len=max_len)
-    valid_X, valid_Y = conv_corpus(valid_sentcs, valid_labels,
-                                   words2idx, label2idx, max_len=max_len)
-    test_X, test_Y = conv_corpus(test_sentcs, test_labels,
-                                 words2idx, label2idx, max_len=max_len)
+    train_X, train_F, train_Y = conv_corpus(
+        train_sentcs, train_featvs, train_labels,
+        words2idx, feats2idx, label2idx, max_len=max_len)
+    valid_X, valid_F, valid_Y = conv_corpus(
+        valid_sentcs, valid_featvs, valid_labels,
+        words2idx, feats2idx, label2idx, max_len=max_len)
+    test_X, test_F, test_Y = conv_corpus(
+        test_sentcs, test_featvs, test_labels,
+        words2idx, feats2idx, label2idx, max_len=max_len)
 
-    train_X = apply_templates(train_X, templates=templates)
-    valid_X = apply_templates(valid_X, templates=templates)
-    test_X = apply_templates(test_X, templates=templates)
+    del train_sentcs, train_featvs, train_labels
+    del valid_sentcs, valid_featvs, valid_labels
+    # del test_sentcs, test_featvs, test_labels
 
     print "#" * 67
     print "Training arguments"
@@ -222,20 +308,26 @@ def main(_):
     print "#" * 67
     print "Training process start."
     print "#" * 67
-    # model = tagger.Bi_LSTM_NER(
-    #     nb_words, FLAGS.emb_dim, emb_mat, FLAGS.hidden_dim, FLAGS.nb_classes,
-    #     FLAGS.keep_prob, FLAGS.batch_size, FLAGS.max_len, FLAGS.l2_reg,
-    #     FLAGS.fine_tuning)
 
-    model = tagger.CNN_Bi_LSTM_NER(
-        nb_words, FLAGS.emb_dim, emb_mat, FLAGS.hidden_dim, FLAGS.nb_classes,
-        FLAGS.keep_prob, FLAGS.batch_size, FLAGS.max_len, FLAGS.l2_reg,
+    if FLAGS.model == 'LSTM':
+        Model_type = tagger.LSTM_NER
+    elif FLAGS.model == 'BLSTM':
+        Model_type = tagger.Bi_LSTM_NER
+    elif FLAGS.model == 'CNNBLSTM':
+        Model_type = tagger.CNN_Bi_LSTM_NER
+    else:
+        raise TypeError("Unknow model type % " % FLAGS.model)
+
+    model = Model_type(
+        nb_words, FLAGS.emb_dim, emb_mat, FLAGS.hidden_dim,
+        FLAGS.nb_classes, FLAGS.dropout, FLAGS.batch_size,
+        FLAGS.max_len, len(template.template), FLAGS.l2_reg,
         FLAGS.fine_tuning)
 
     pred_test, test_loss, test_acc = model.run(
-        train_X, train_Y, train_lens,
-        valid_X, valid_Y, valid_lens,
-        test_X, test_Y, test_lens,
+        train_F, train_Y, train_lens,
+        valid_F, valid_Y, valid_lens,
+        test_F, test_Y, test_lens,
         FLAGS)
 
     print "Test loss: %f, accuracy: %f" % (test_loss, test_acc)
@@ -244,10 +336,13 @@ def main(_):
     if FLAGS.eval_test:
         res_test, pred_test_label = evaluate(pred_test_label, test_labels)
         print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
-    original_text = [[item[0] for item in sent] for sent in test_corpus]
+    # original_text = [[item[0] for item in sent] for sent in test_corpus]
     write_prediction(FLAGS.output_dir + 'prediction.utf8',
-                     original_text, pred_test_label)
+                     test_sentcs, pred_test_label)
 
+    print "Saving feature dicts..."
+    save_dicts(FLAGS.output_dir, FLAGS.feats2idx,
+               FLAGS.words2idx, FLAGS.label2idx)
 
 if __name__ == "__main__":
     tf.app.run()
