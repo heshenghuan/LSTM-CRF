@@ -9,7 +9,7 @@ http://github.com/heshenghuan
 
 import sys
 import codecs as cs
-from keras_src.evaluate_util import eval_ner
+from lib.utils import eval_ner
 
 
 def read_corpus(corpus):
