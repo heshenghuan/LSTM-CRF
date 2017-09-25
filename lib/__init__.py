@@ -12,4 +12,4 @@ __all__ = [
     "utils", "pretreatment"
 ]
 
-__version__ = 'NeuralTextProcess lib 0.1.2'
+__version__ = 'NeuralTextProcess lib 0.1.3'

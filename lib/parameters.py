@@ -11,8 +11,8 @@ Some env params may need to use.
 
 
 OOV = '_OOV_'
-START = '_S_'
-END = '_E_'
+START = '</s>'
+END = '</s>'
 GOLD_TAG = 'GoldNER'
 PRED_TAG = 'NER'
 task = 'ner'

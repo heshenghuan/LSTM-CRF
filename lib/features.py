@@ -88,6 +88,9 @@ class Template(object):
     def suffix(self):
         return self._suffix
 
+    def size(self):
+        return len(self._template)
+
 
 # Field names of the input data.
 # fields = ['w', 'y']
