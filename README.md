@@ -214,6 +214,10 @@ So you must give a specific path to 'restore\_model'.
 
 ## History
 
+- **2017-10-20 ver 0.2.1**
+  - Fix: Non-suffix for template in 'only test' process.
+  - Fix: Now using correct dicts for embedding lookup table.
+  - Fix: A bug of batch generator 'batch_index'.
 - **2017-09-12 ver 0.2.0**
   - Update: process lib 0.1.2
   - Removed 'keras_src', completed the refactoring of the code hierarchy.
