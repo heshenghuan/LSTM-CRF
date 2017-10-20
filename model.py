@@ -19,10 +19,13 @@ __all__ = ['LSTM_NER', 'Bi_LSTM_NER', 'CNN_Bi_LSTM_NER']
 
 def batch_index(length, batch_size, n_iter=100, shuffle=True):
     index = range(length)
+    rd = int(length / batch_size)
+    if length % batch_size != 0:
+        rd += 1
     for j in xrange(n_iter):
         if shuffle:
             np.random.shuffle(index)
-        for i in xrange(int(length / batch_size) + 1):
+        for i in xrange(rd):
             yield index[i * batch_size: (i + 1) * batch_size]
 
 
