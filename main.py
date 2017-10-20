@@ -129,7 +129,7 @@ def test(FLAGS):
     print "Test: ", FLAGS.test_data
 
     # Load feature templates
-    template = Template(FLAGS.template)
+    template = Template(FLAGS.template, suffix=False)
 
     # Load dicts
     feats2idx, words2idx, label2idx = load_dicts(
@@ -139,7 +139,7 @@ def test(FLAGS):
     # load embeddings from file
     print "#" * 67
     print "# Reading embeddings from file: %s" % (FLAGS.emb_file)
-    emb_mat, idx_map = read_emb_from_file(FLAGS.emb_file, words2idx)
+    emb_mat, idx_map = read_emb_from_file(FLAGS.emb_file, feats2idx)
     FLAGS.emb_dim = max(emb_mat.shape[1], FLAGS.emb_dim)
     print "embeddings' size:", emb_mat.shape
     if FLAGS.fine_tuning:
@@ -161,9 +161,8 @@ def test(FLAGS):
 
     test_sentcs, test_featvs, test_labels = unfold_corpus(test_corpus)
 
-    print "Lexical word size:     %d" % len(words2idx)
+    print "Lexical word size:     %d" % len(feats2idx)
     print "Label size:            %d" % len(label2idx)
-    print "Features size:         %d" % len(feats2idx)
     print "-------------------------------------------------------------------"
     print "Test data size:        %d" % len(test_corpus)
     print "Maximum sentence len:  %d" % FLAGS.max_len
@@ -270,7 +269,7 @@ def main(_):
     # load embeddings from file
     print "#" * 67
     print "# Reading embeddings from file: %s" % (FLAGS.emb_file)
-    emb_mat, idx_map = read_emb_from_file(FLAGS.emb_file, words2idx)
+    emb_mat, idx_map = read_emb_from_file(FLAGS.emb_file, feats2idx)
     FLAGS.emb_dim = max(emb_mat.shape[1], FLAGS.emb_dim)
     print "embeddings' size:", emb_mat.shape
     if FLAGS.fine_tuning:
