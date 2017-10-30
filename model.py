@@ -333,7 +333,7 @@ class LSTM_NER(neural_tagger):
             outputs = tf.reshape(outputs, [-1, self.hidden_dim])
             # outputs = tf.nn.dropout(outputs, keep_prob=self.keep_prob)
 
-        with tf.name_scope('softmax'):
+        with tf.name_scope('linear_transform'):
             scores = tf.matmul(outputs, self.W) + self.b
             # scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
@@ -377,7 +377,7 @@ class Bi_LSTM_NER(neural_tagger):
             outputs = tf.reshape(outputs, [-1, self.hidden_dim * 2])
             # outputs = tf.nn.dropout(outputs, keep_prob=self.keep_prob)
 
-        with tf.name_scope('softmax'):
+        with tf.name_scope('linear_transform'):
             scores = tf.matmul(outputs, self.W) + self.b
             # scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
@@ -441,7 +441,7 @@ class CNN_Bi_LSTM_NER(neural_tagger):
             outputs = tf.reshape(outputs, [-1, self.hidden_dim * 2])
             # outputs = tf.nn.dropout(outputs, keep_prob=self.keep_prob)
 
-        with tf.name_scope('softmax'):
+        with tf.name_scope('linear_transform'):
             scores = tf.matmul(outputs, self.W) + self.b
             # scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
