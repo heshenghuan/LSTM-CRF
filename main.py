@@ -198,8 +198,9 @@ def test(FLAGS):
     if FLAGS.eval_test:
         res_test, pred_test_label = evaluate(pred_test_label, test_labels)
         print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
+    original_text = [[item['w'] for item in sent] for sent in test_corpus]
     write_prediction(FLAGS.output_dir + 'prediction.utf8',
-                     test_sentcs, pred_test_label)
+                     original_text, pred_test_label)
 
 
 def main(_):
@@ -255,7 +256,7 @@ def main(_):
 
     del train_corpus
     del valid_corpus
-    del test_corpus
+    # del test_corpus
 
     # neural network's output_dim
     nb_classes = len(label2idx)
@@ -290,9 +291,12 @@ def main(_):
         test_sentcs, test_featvs, test_labels,
         words2idx, feats2idx, label2idx, max_len=max_len)
 
+    # Release memory
     del train_sentcs, train_featvs, train_labels
     del valid_sentcs, valid_featvs, valid_labels
     # del test_sentcs, test_featvs, test_labels
+
+    del train_X, valid_X, test_X
 
     print "#" * 67
     print "Training arguments"
@@ -335,9 +339,9 @@ def main(_):
     if FLAGS.eval_test:
         res_test, pred_test_label = evaluate(pred_test_label, test_labels)
         print "Test F1: %f, P: %f, R: %f" % (res_test['f1'], res_test['p'], res_test['r'])
-    # original_text = [[item[0] for item in sent] for sent in test_corpus]
+    original_text = [[item['w'] for item in sent] for sent in test_corpus]
     write_prediction(FLAGS.output_dir + 'prediction.utf8',
-                     test_sentcs, pred_test_label)
+                     original_text, pred_test_label)
 
     print "Saving feature dicts..."
     save_dicts(FLAGS.output_dir, FLAGS.feats2idx,
