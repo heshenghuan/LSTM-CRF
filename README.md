@@ -214,6 +214,9 @@ So you must give a specific path to 'restore\_model'.
 
 ## History
 
+- **2017-10-31 ver 0.2.2**
+  - Update Neural Text Process lib 0.2.0
+  - Compatible modification in main file.
 - **2017-10-20 ver 0.2.1**
   - Fix: Non-suffix for template in 'only test' process.
   - Fix: Now using correct dicts for embedding lookup table.
