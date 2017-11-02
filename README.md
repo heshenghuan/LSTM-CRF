@@ -1,30 +1,11 @@
-# LSTM-NER
+# LSTM-CRF
 
 ## Introduction
 
-An implementation of LSTM named entity recognition based on Keras. Using two kinds of embeddings as a representation of characters, they are char-embeddings and char-postion-embeddings.
+An implementation of LSTM+CRF model for Sequence labeling tasks. Based on Tensorflow(>=r1.1), and support multiple architecture like LSTM+CRF, BiLSTM+CRF, and combination of character-level CNN and BiLSTM+CRF.
 
->  Inspired by the work of Nanyun Peng and Mark Dredze. The idea of using different kinds of embeddings in a NER task is very brilliant.
->
->  And I used the same embeddings provided by their open source [repo](https://github.com/hltcoe/golden-horse).
+Other architecture of RNN+CRF, like traditional feature involved architecture will be adding after.
 
-### Reference
-
- **Named Entity Recognition for Chinese Social Media with Jointly Trained Embeddings**
-
->  Nanyun Peng and Mark Dredze 
->
->  *Conference on Empirical Methods in Natural Language Processing (EMNLP)*, 2015 
->
->  If you use the code, please kindly cite the following bibtex:
->
->  @inproceedings{peng2015ner, 
->  title={Named Entity Recognition for Chinese Social Media with Jointly Trained Embeddings.}, 
->  author={Peng, Nanyun and Dredze, Mark}, 
->  booktitle={EMNLP}, 
->  pages={548–-554}, 
->  year={2015} 
->  }
 
 
 ## Dependecies
@@ -33,7 +14,7 @@ Because this project used Tensorflow API, it requires installation of Tensorflow
 
 - Tensorflow ( >= r1.1)
 
-Both of them can be easily installed by `pip`. 
+Both of them can be easily installed by `pip`.
 
 ## Data Format
 
@@ -62,6 +43,8 @@ Here's an example of such a file: (data for Chinese NER)
 ```
 
 ## Featrue template
+
+This part you can read the readme file under lib directory, which is a submodule named [NeuralTextProcess](https://github.com/heshenghuan/ContextFeatureExtractor).
 
 In file `template` specificated the feature template which used in context-based feature extraction. The second line `fields` indicates the field name for each column of a token. And the `templates` described how to extract features.
 
@@ -96,20 +79,7 @@ In this project, I disabled suffix of feature to extract words in a context wind
 
 ## Embeddings
 
-This program supports word/char embeddings input. When running this program, you should give a embedding file(word2vec standard output format) by specific argument.
-
-1. **char-embeddings**
-
-   Embeddings learnt from each character in a large unlabled text.
-
-2. **char-postion embeddings**
-
-   Character embeddings cannot distinguish between uses of the same character in different contexts, whereas word embeddings fail to make use of characters or character *n-gram*s that are part of many words.
-
-   **'char-postion embeddings'** is a compromise to use character embeddings that are sensitive to the character's position in the word.
-
-All of those embeddings are trained on a large corpus of Weibo messages.
-
+This program supports pretrained embeddings input. When running this program, you should give a embedding text file(word2vec tool standard output format) by specific argument.
 
 ## Usage
 
