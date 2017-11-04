@@ -19,6 +19,7 @@ class Hybrid_LSTM_tagger(neural_tagger):
     A LSTM+CRF tagger which used hybrid feature. Hybrid feature is a
     combination of traditional context feature and window-repr embeddings.
     """
+
     def __init__(self, nb_words, emb_dim, emb_matrix, feat_size, hidden_dim,
                  nb_classes, time_steps, fine_tuning=False, drop_rate=1.0,
                  batch_size=None, templates=1, window=1, l2_reg=0.):
@@ -67,22 +68,25 @@ class Hybrid_LSTM_tagger(neural_tagger):
             self.W = tf.get_variable(
                 shape=[self.hidden_dim, self.nb_classes],
                 initializer=tf.random_uniform_initializer(-0.2, 0.2),
+                # initializer=tf.truncated_normal_initializer(stddev=0.01),
                 name='lstm_weights'
             )
             self.T = tf.get_variable(
                 shape=[self.feat_size, self.nb_classes],
                 initializer=tf.random_uniform_initializer(-0.2, 0.2),
+                # initializer=tf.truncated_normal_initializer(stddev=0.01),
                 name='feat_weights'
             )
             self.lstm_fw = tf.contrib.rnn.LSTMCell(self.hidden_dim)
 
         with tf.name_scope('biases'):
-            self.b = tf.get_variable(
-                shape=[self.nb_classes],
-                initializer=tf.truncated_normal_initializer(stddev=0.01),
-                # initializer=tf.random_uniform_initializer(-0.2, 0.2),
-                name="bias"
-            )
+            self.b = tf.Variable(tf.zeros([self.nb_classes], name="bias"))
+            # self.b = tf.get_variable(
+            #     shape=[self.nb_classes],
+            #     initializer=tf.truncated_normal_initializer(stddev=0.01),
+            #     # initializer=tf.random_uniform_initializer(-0.2, 0.2),
+            #     name="bias"
+            # )
         return
 
     def inference(self, X, F, X_len, reuse=None):
@@ -124,6 +128,18 @@ class Hybrid_LSTM_tagger(neural_tagger):
                 self.keep_prob: keep_prob,
             }
             yield feed_dict, len(index)
+
+    def loss(self, pred):
+        with tf.name_scope('loss'):
+            log_likelihood, self.transition = tf.contrib.crf.crf_log_likelihood(
+                pred, self.Y, self.X_len)
+            cost = tf.reduce_mean(-log_likelihood)
+            reg = tf.nn.l2_loss(self.T) + \
+                tf.nn.l2_loss(self.W) + tf.nn.l2_loss(self.b)
+            if self.fine_tuning:
+                reg += tf.nn.l2_loss(self.emb_matrix)
+            cost += reg * self.l2_reg
+            return cost
 
     def run(
         self,
