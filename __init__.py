@@ -11,7 +11,8 @@ from lib import utils, pretreatment, parameters, features
 
 __all__ = [
     'model', 'main', 'utils', 'pretreatment',
-    'parameters', 'features'
+    'parameters', 'features',
+    'hybrid_model', 'hybrid_tagger'
 ]
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'

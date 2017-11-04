@@ -184,6 +184,8 @@ So you must give a specific path to 'restore\_model'.
 
 ## History
 
+- **2017-11-04 ver 0.2.3**
+  - Hybrid feature architecture for LSTM and corresponding tagger's python script.
 - **2017-10-31 ver 0.2.2**
   - Update Neural Text Process lib 0.2.0
   - Compatible modification in main file.
