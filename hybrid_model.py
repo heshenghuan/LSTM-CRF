@@ -114,7 +114,7 @@ class Hybrid_LSTM_tagger(neural_tagger):
 
         with tf.name_scope('softmax'):
             scores = feat_sum + tf.matmul(outputs, self.W) + self.b
-            scores = tf.nn.softmax(scores)
+            # scores = tf.nn.softmax(scores)
             scores = tf.reshape(scores, [-1, self.time_steps, self.nb_classes])
         return scores
 
@@ -204,7 +204,7 @@ class Hybrid_LSTM_tagger(neural_tagger):
                     Summary_dir + '/valid')
 
         with tf.Session() as sess:
-            sess.run(tf.initialize_all_variables())
+            sess.run(tf.global_variables_initializer())
             max_acc, bestIter = 0., 0
 
             if self.training_iter == 0:

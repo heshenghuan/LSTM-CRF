@@ -236,7 +236,7 @@ class neural_tagger(object):
                 saver.restore(sess, FLAGS.restore_model)
                 print "[+] Model restored from %s" % FLAGS.restore_model
             else:
-                sess.run(tf.initialize_all_variables())
+                sess.run(tf.global_variables_initializer())
 
             for epoch in xrange(self.training_iter):
 
