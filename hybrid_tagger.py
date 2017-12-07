@@ -57,6 +57,8 @@ tf.app.flags.DEFINE_boolean(
     'log', True, 'Whether to record the TensorBoard log.')
 tf.app.flags.DEFINE_string("template", r"template", "Feature templates")
 tf.app.flags.DEFINE_integer("window", 1, "Window size of context")
+tf.app.flags.DEFINE_integer(
+    "feat_thresh", 0, "Only keep feats which occurs more than 'thresh' times.")
 
 
 def convert_id_to_word(corpus, idx2label, default='O'):
@@ -152,7 +154,7 @@ def main(_):
     # pretreatment process: read, split and create vocabularies
     train_set, valid_set, test_set, dicts, max_len = pretreatment(
         FLAGS.train_data, FLAGS.valid_data, FLAGS.test_data,
-        threshold=0, template=template)
+        threshold=FLAGS.feat_thresh, template=template)
 
     # Reset the maximum sentence's length
     # max_len = max(MAX_LEN, max_len)
