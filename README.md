@@ -18,9 +18,9 @@ Both of them can be easily installed by `pip`.
 
 ## Data Format
 
-The data format is basically consistent with the CRF++ toolkit. Generally speaking, training and test file must consist of multiple tokens. In addition, a token consists of multiple (but fixed-numbers) columns. Each token must be represented in one line, with the columns separated by white space (spaces or tabular characters). A sequence of token becomes a sentence. (So far, this program only supports data with 3-columns.)
+The data format is basically consistent with the CRF++ toolkit. Generally speaking, training and test file must consist of multiple tokens. In addition, a token consists of multiple (but fixed-numbers) columns. Each token must be represented in one line, with the columns separated by white space (spaces or tabular characters). A sequence of token becomes a sentence.
 
-To identify the boundary between sentences, an empty line is put.
+To identify the boundary between sentences, an empty line is put. **It means there should be a '\n\n' between two different sentences.** So, if your OS is Windows, please check out what the boundary character really is.
 
 Here's an example of such a file: (data for Chinese NER)
 
