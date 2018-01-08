@@ -6,8 +6,6 @@ An implementation of LSTM+CRF model for Sequence labeling tasks. Based on Tensor
 
 Other architecture of RNN+CRF, like traditional feature involved architecture will be adding after.
 
-
-
 ## Dependecies
 
 Because this project used Tensorflow API, it requires installation of Tensorflow and some other python modules:
@@ -24,7 +22,7 @@ To identify the boundary between sentences, an empty line is put. **It means the
 
 Here's an example of such a file: (data for Chinese NER)
 
-```
+```text
 ...
 感	O
 动	O
@@ -50,7 +48,7 @@ In file `template` specificated the feature template which used in context-based
 
 For example, the basic template is:
 
-```
+```text
 # Fields(column), w,y&F are reserved names
 w y
 # templates.
@@ -110,7 +108,7 @@ python main.py --lr 0.005 --fine_tuning False --l2_reg 0.0002
 
 Then the model will run on lr=0.005, not fine-tuning, l2_reg=0.0002 and all others default. Using `-h` will print all help informations. Some arguments are not useable now, but I will fix it as soon as possible.
 
-```
+```shell
 python main.py -h
 usage: main.py [-h] [--train_data TRAIN_DATA] [--test_data TEST_DATA]
                [--valid_data VALID_DATA] [--log_dir LOG_DIR]
@@ -171,7 +169,8 @@ optional arguments:
   --template TEMPLATE   Feature templates
 ```
 
-There has three type of model can be choosed by using argument '--model', they are: 
+There has three type of model can be choosed by using argument '--model', they are:
+
 1. LSTM + CRF
 2. BiLSTM + CRF
 3. CNN + BiLSTM + CRF
@@ -220,6 +219,6 @@ So you must give a specific path to 'restore\_model'.
   - Added 3 module file: *features*, *pretreatment* and *constant*
   - Pretreatment's create dictionary function completed
 - **2017-02-20 ver 0.0.1**
-  - Initialization of this project. 
+  - Initialization of this project.
   - README file
   - Some util functions and basical structure of project
