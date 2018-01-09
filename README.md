@@ -100,6 +100,8 @@ If your don't have those dirs in your project dir, just run `python env_settings
 
 ### Training
 
+#### Only use embeddings as features
+
 Just run the **./main.py** file. Or specify some arguments if you need, like this:
 
 ```shell
@@ -174,6 +176,77 @@ There has three type of model can be choosed by using argument '--model', they a
 1. LSTM + CRF
 2. BiLSTM + CRF
 3. CNN + BiLSTM + CRF
+
+#### Use both embeddings and context as features
+
+We proposed a [hybrid model](./hybrid_model.py) which can use both embeddings and contextual features as input for sequence labeling task. The embeddings are used as input of RNN. And the contextual features are used like traditional feature functions in CRFs.
+
+Just run the **./hybird_tagger.py** file. Or specify some arguments if you need, like this:
+
+```shell
+python hybrid_tagger.py -h
+usage: hybrid_tagger.py [-h] [--train_data TRAIN_DATA] [--test_data TEST_DATA]
+                        [--valid_data VALID_DATA] [--log_dir LOG_DIR]
+                        [--model_dir MODEL_DIR]
+                        [--restore_model RESTORE_MODEL] [--emb_file EMB_FILE]
+                        [--emb_dim EMB_DIM] [--output_dir OUTPUT_DIR]
+                        [--only_test [ONLY_TEST]] [--noonly_test] [--lr LR]
+                        [--dropout DROPOUT] [--fine_tuning [FINE_TUNING]]
+                        [--nofine_tuning] [--eval_test [EVAL_TEST]]
+                        [--noeval_test] [--max_len MAX_LEN]
+                        [--nb_classes NB_CLASSES] [--hidden_dim HIDDEN_DIM]
+                        [--batch_size BATCH_SIZE] [--train_steps TRAIN_STEPS]
+                        [--display_step DISPLAY_STEP] [--l2_reg L2_REG]
+                        [--log [LOG]] [--nolog] [--template TEMPLATE]
+                        [--window WINDOW] [--feat_thresh FEAT_THRESH]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --train_data TRAIN_DATA
+                        Training data file
+  --test_data TEST_DATA
+                        Test data file
+  --valid_data VALID_DATA
+                        Validation data file
+  --log_dir LOG_DIR     The log dir
+  --model_dir MODEL_DIR
+                        Models dir
+  --restore_model RESTORE_MODEL
+                        Path of the model to restored
+  --emb_file EMB_FILE   Embeddings file
+  --emb_dim EMB_DIM     embedding size
+  --output_dir OUTPUT_DIR
+                        Output dir
+  --only_test [ONLY_TEST]
+                        Only do the test
+  --noonly_test
+  --lr LR               learning rate
+  --dropout DROPOUT     Dropout rate of input layer
+  --fine_tuning [FINE_TUNING]
+                        Whether fine-tuning the embeddings
+  --nofine_tuning
+  --eval_test [EVAL_TEST]
+                        Whether evaluate the test data.
+  --noeval_test
+  --max_len MAX_LEN     max num of tokens per query
+  --nb_classes NB_CLASSES
+                        Tagset size
+  --hidden_dim HIDDEN_DIM
+                        hidden unit number
+  --batch_size BATCH_SIZE
+                        num example per mini batch
+  --train_steps TRAIN_STEPS
+                        trainning steps
+  --display_step DISPLAY_STEP
+                        number of test display step
+  --l2_reg L2_REG       L2 regularization weight
+  --log [LOG]           Whether to record the TensorBoard log.
+  --nolog
+  --template TEMPLATE   Feature templates
+  --window WINDOW       Window size of context
+  --feat_thresh FEAT_THRESH
+                        Only keep feats which occurs more than 'thresh' times.
+```
 
 ### Test
 
