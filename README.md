@@ -49,7 +49,7 @@ In file `template` specificated the feature template which used in context-based
 For example, the basic template is:
 
 ```text
-# Fields(column), w,y&F are reserved names
+# Fields(column), w, y, x & F are reserved names
 w y
 # templates.
 w:-2
