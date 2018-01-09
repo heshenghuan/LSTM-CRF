@@ -73,7 +73,7 @@ The above `templates` describes a classical context feature template:
 
 If your token has more than 2 columns, you may need change the fields and template depends on how you want to do extraction.
 
-In this project, I disabled suffix of feature to extract words in a context window.
+In this project, I disabled prefix of feature to extract words in a context window.
 
 ## Embeddings
 
@@ -100,7 +100,7 @@ If your don't have those dirs in your project dir, just run `python env_settings
 
 ### Training
 
-#### Only use embeddings as features
+#### 1. Using embeddings as features
 
 Just run the **./main.py** file. Or specify some arguments if you need, like this:
 
@@ -177,7 +177,7 @@ There has three type of model can be choosed by using argument '--model', they a
 2. BiLSTM + CRF
 3. CNN + BiLSTM + CRF
 
-#### Use both embeddings and context as features
+#### 2. Using both embeddings and context
 
 We proposed a [hybrid model](./hybrid_model.py) which can use both embeddings and contextual features as input for sequence labeling task. The embeddings are used as input of RNN. And the contextual features are used like traditional feature functions in CRFs.
 
@@ -256,6 +256,9 @@ So you must give a specific path to 'restore\_model'.
 
 ## History
 
+- **2018-01-09 ver 0.2.4**
+  - Update Neural Text Process lib 0.2.1
+  - Compatible modification in main file.
 - **2017-11-04 ver 0.2.3**
   - Hybrid feature architecture for LSTM and corresponding tagger's python script.
 - **2017-10-31 ver 0.2.2**

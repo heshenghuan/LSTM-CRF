@@ -15,4 +15,4 @@ __all__ = [
     'hybrid_model', 'hybrid_tagger'
 ]
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'
