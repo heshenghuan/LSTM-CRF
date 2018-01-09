@@ -129,7 +129,7 @@ def test(FLAGS):
     print "Test: ", FLAGS.test_data
 
     # Load feature templates
-    template = Template(FLAGS.template, suffix=False)
+    template = Template(FLAGS.template, prefix=False)
 
     # Load dicts
     feats2idx, words2idx, label2idx = load_dicts(
@@ -220,7 +220,7 @@ def main(_):
     print "Test: ", FLAGS.test_data
 
     # Choose fields templates & features templates
-    template = Template(FLAGS.template, suffix=False)
+    template = Template(FLAGS.template, prefix=False)
     # pretreatment process: read, split and create vocabularies
     train_set, valid_set, test_set, dicts, max_len = pretreatment(
         FLAGS.train_data, FLAGS.valid_data, FLAGS.test_data,
